@@ -6,6 +6,19 @@ import { UrchinConfig } from '../core/config';
 import { sanitize } from '../core/redaction';
 import { Collector, UrchinEvent } from '../types';
 
+interface ProjectTranscriptResult {
+  events: UrchinEvent[];
+  sessionIds: Set<string>;
+}
+
+const LOW_SIGNAL_PATTERNS = [
+  /^\/(?:clear|compact|resume|rate-limit-options)\b/i,
+  /^<command-name>/i,
+  /^\[Pasted text #\d+/,
+  /^This session is being continued from a previous conversation/i,
+  /^\d{12,}$/,
+];
+
 function summary(text: string): string {
   return sanitize(text, 140).split('\n')[0] ?? 'Claude event';
 }
@@ -40,19 +53,27 @@ function extractTranscriptText(entry: any): string {
   return parts.join('\n\n');
 }
 
+function isLowSignal(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return true;
+  }
+
+  return LOW_SIGNAL_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
 export class ClaudeCollector implements Collector {
   name: 'claude' = 'claude';
 
   constructor(private readonly config: UrchinConfig) {}
 
   async collect(since?: Date): Promise<UrchinEvent[]> {
-    const events: UrchinEvent[] = [];
-    events.push(...await this.collectHistory(since));
-    events.push(...await this.collectProjectTranscripts(since));
-    return events;
+    const { events: transcriptEvents, sessionIds } = await this.collectProjectTranscripts(since);
+    const historyEvents = await this.collectHistory(since, sessionIds);
+    return [...historyEvents, ...transcriptEvents];
   }
 
-  private async collectHistory(since?: Date): Promise<UrchinEvent[]> {
+  private async collectHistory(since: Date | undefined, transcriptSessionIds: Set<string>): Promise<UrchinEvent[]> {
     const historyFile = this.config.claudeHistoryFile;
     if (!(await fs.pathExists(historyFile))) {
       return [];
@@ -71,7 +92,11 @@ export class ClaudeCollector implements Collector {
           continue;
         }
 
-        if (typeof entry.display !== 'string' || !entry.display.trim()) {
+        if (transcriptSessionIds.has(entry.sessionId)) {
+          continue;
+        }
+
+        if (typeof entry.display !== 'string' || isLowSignal(entry.display)) {
           continue;
         }
 
@@ -99,11 +124,11 @@ export class ClaudeCollector implements Collector {
     return events;
   }
 
-  private async collectProjectTranscripts(since?: Date): Promise<UrchinEvent[]> {
+  private async collectProjectTranscripts(since?: Date): Promise<ProjectTranscriptResult> {
     const claudeRoot = path.dirname(this.config.claudeHistoryFile);
     const projectRoot = path.join(claudeRoot, 'projects');
     if (!(await fs.pathExists(projectRoot))) {
-      return [];
+      return { events: [], sessionIds: new Set<string>() };
     }
 
     const files = await glob('**/*.jsonl', {
@@ -113,6 +138,7 @@ export class ClaudeCollector implements Collector {
     });
 
     const events: UrchinEvent[] = [];
+    const sessionIds = new Set<string>();
 
     for (const filePath of files) {
       const rawData = await fs.readFile(filePath, 'utf8');
@@ -129,8 +155,12 @@ export class ClaudeCollector implements Collector {
           }
 
           const content = extractTranscriptText(entry);
-          if (!content.trim()) {
+          if (isLowSignal(content)) {
             continue;
+          }
+
+          if (typeof entry.sessionId === 'string') {
+            sessionIds.add(entry.sessionId);
           }
 
           events.push({
@@ -160,6 +190,6 @@ export class ClaudeCollector implements Collector {
       }
     }
 
-    return events;
+    return { events, sessionIds };
   }
 }
