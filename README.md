@@ -12,6 +12,7 @@ Urchin is a local-first context bridge that pulls scattered AI and workflow acti
 
 - `urchin` or `urchin sync` — collect recent activity and write timeline notes
 - `urchin dump "text"` — append a manual capture into the Obsidian inbox
+- `urchin ingest --source browser --kind capture --scope network "captured text"` — append an external/browser-style event into the bounded intake queue
 - `urchin status` — show resolved config and sync state
 
 ## Development

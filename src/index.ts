@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 
+import { randomUUID } from 'node:crypto';
+import * as fs from 'fs-extra';
+import * as path from 'node:path';
+
 import { ClaudeCollector } from './collectors/claude';
 import { CopilotCollector } from './collectors/copilot';
 import { GeminiCollector } from './collectors/gemini';
+import { IntakeCollector } from './collectors/intake';
 import { OpenClawCollector } from './collectors/openclaw';
 import { GitCollector, ShellCollector } from './collectors/shell';
 import { loadConfig } from './core/config';
@@ -11,7 +16,31 @@ import { sanitize } from './core/redaction';
 import { loadState, saveState } from './core/state';
 import { appendManualCapture, writeArchive, writeArchiveIndex } from './obsidian/writer';
 import { Linker } from './synthesis/linker';
-import { UrchinEvent } from './types';
+import { EventKind, EventSource, UrchinEvent } from './types';
+
+function parseFlags(args: string[]): { flags: Record<string, string>; rest: string[] } {
+  const flags: Record<string, string> = {};
+  const rest: string[] = [];
+
+  for (let index = 0; index < args.length; index += 1) {
+    const current = args[index];
+    if (current?.startsWith('--')) {
+      const key = current.slice(2);
+      const value = args[index + 1];
+      if (value && !value.startsWith('--')) {
+        flags[key] = value;
+        index += 1;
+      } else {
+        flags[key] = 'true';
+      }
+      continue;
+    }
+
+    rest.push(current ?? '');
+  }
+
+  return { flags, rest };
+}
 
 async function main() {
   const config = loadConfig();
@@ -26,6 +55,11 @@ async function main() {
     }
 
     await dumpThought(config, text);
+    return;
+  }
+
+  if (command === 'ingest') {
+    await ingest(config, args.slice(1));
     return;
   }
 
@@ -53,6 +87,7 @@ async function sync(config: ReturnType<typeof loadConfig>) {
   console.log(`Urchin: syncing context since ${sinceDate.toISOString()}`);
 
   const collectors = [
+    new IntakeCollector(config),
     new CopilotCollector(config),
     new GeminiCollector(config),
     new ClaudeCollector(config),
@@ -106,6 +141,7 @@ async function status(config: ReturnType<typeof loadConfig>) {
         copilotSessionRoot: config.copilotSessionRoot,
         geminiTmpRoot: config.geminiTmpRoot,
         inboxCapturePath: config.inboxCapturePath,
+        intakeRoot: config.intakeRoot,
         lastSuccessfulSyncAt: state.lastSuccessfulSyncAt ?? null,
         openclawCommandsLog: config.openclawCommandsLog,
         reposRoots: config.reposRoots,
@@ -117,6 +153,37 @@ async function status(config: ReturnType<typeof loadConfig>) {
       2,
     ),
   );
+}
+
+async function ingest(config: ReturnType<typeof loadConfig>, args: string[]) {
+  const { flags, rest } = parseFlags(args);
+  const content = rest.join(' ').trim();
+  if (!content) {
+    console.error('Usage: urchin ingest --source browser --kind capture --location extension://name "captured text"');
+    process.exit(1);
+  }
+
+  const knownSources: EventSource[] = ['browser', 'claude', 'copilot', 'gemini', 'git', 'manual', 'openclaw', 'shell'];
+  const knownKinds: EventKind[] = ['activity', 'capture', 'code', 'conversation', 'ops'];
+  const source = knownSources.includes(flags.source as EventSource) ? (flags.source as EventSource) : 'manual';
+  const kind = knownKinds.includes(flags.kind as EventKind) ? (flags.kind as EventKind) : 'capture';
+  const targetFile = path.join(config.intakeRoot, `${source}.jsonl`);
+  const event = {
+    id: randomUUID(),
+    source,
+    kind,
+    timestamp: new Date().toISOString(),
+    summary: flags.summary ?? content.slice(0, 140),
+    content,
+    tags: flags.tags ? flags.tags.split(',').map((tag) => tag.trim()).filter(Boolean) : [],
+    metadata: flags.title ? { title: flags.title } : {},
+    scope: flags.scope === 'network' ? 'network' : 'local',
+    sessionId: flags.sessionId,
+  };
+
+  await fs.ensureDir(path.dirname(targetFile));
+  await fs.appendFile(targetFile, `${JSON.stringify(event)}\n`, 'utf8');
+  console.log(`Urchin: ingested ${source} event into ${targetFile}`);
 }
 
 main().catch(console.error);

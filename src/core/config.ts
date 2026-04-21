@@ -8,6 +8,7 @@ export interface UrchinConfig {
   copilotSessionRoot: string;
   geminiTmpRoot: string;
   inboxCapturePath: string;
+  intakeRoot: string;
   openclawCommandsLog: string;
   reposRoots: string[];
   shellHistoryFile: string;
@@ -49,6 +50,7 @@ export function loadConfig(): UrchinConfig {
     copilotSessionRoot: expandHome(process.env.URCHIN_COPILOT_SESSION_ROOT ?? '~/.copilot/session-state'),
     geminiTmpRoot: expandHome(process.env.URCHIN_GEMINI_TMP_ROOT ?? '~/.gemini/tmp'),
     inboxCapturePath: expandHome(process.env.URCHIN_INBOX_CAPTURE_PATH ?? path.join(vaultRoot, '00-inbox', 'urchin-capture.md')),
+    intakeRoot: expandHome(process.env.URCHIN_INTAKE_ROOT ?? '~/.local/share/urchin/intake'),
     openclawCommandsLog: expandHome(process.env.URCHIN_OPENCLAW_COMMANDS_LOG ?? '~/.openclaw/logs/commands.log'),
     reposRoots: splitPaths(process.env.URCHIN_REPOS_ROOTS, [expandHome('~/dev'), expandHome('~/repos')]),
     shellHistoryFile: expandHome(process.env.URCHIN_SHELL_HISTORY_FILE ?? '~/.bash_history'),
