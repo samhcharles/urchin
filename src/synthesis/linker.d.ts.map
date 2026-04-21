@@ -1,1 +1,0 @@
-{"version":3,"file":"linker.d.ts","sourceRoot":"","sources":["linker.ts"],"names":[],"mappings":"AAIA,qBAAa,MAAM;IAGL,OAAO,CAAC,SAAS;IAF7B,OAAO,CAAC,QAAQ,CAAgB;gBAEZ,SAAS,EAAE,MAAM;IAE/B,UAAU;IAehB,IAAI,CAAC,IAAI,EAAE,MAAM,GAAG,MAAM;IAc1B,OAAO,CAAC,YAAY;CAGrB"}
