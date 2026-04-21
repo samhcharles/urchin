@@ -19,6 +19,8 @@ See [`docs/architecture.md`](docs/architecture.md) for the core-plus-spikes mode
 
 ## Commands
 
+- `urchin init --mode existing` — wire Urchin into an existing vault without destructive scaffolding
+- `urchin init --mode starter --vault /path/to/vault` — scaffold a starter vault layout for Urchin
 - `urchin` or `urchin sync` — collect recent activity and write timeline notes
 - `urchin dump "text"` — append a manual capture into the Obsidian inbox
 - `urchin ingest --source browser --kind capture --scope network "captured text"` — append an external/browser-style event into the bounded intake queue
@@ -31,6 +33,7 @@ If a collector fails during `urchin sync`, Urchin now refuses to advance the syn
 ```bash
 npm install
 npm run build
+node dist/src/index.js init --mode existing
 node dist/src/index.js status
 ```
 
@@ -54,6 +57,13 @@ Urchin defaults to the local paths used in this workflow, but every important pa
 For day-to-day use, start with `urchin status`, confirm the resolved paths, then run `urchin sync`.
 
 `URCHIN_PROJECT_ALIAS_PATH` lets you pin repo or workspace names to real project notes when the names do not line up exactly.
+
+Urchin now supports two install modes:
+
+- **existing** — create only the inbox/archive wiring Urchin needs inside an existing vault
+- **starter** — scaffold a minimal vault structure for people adopting Urchin as the beginning of a second brain
+
+See [`docs/editor-contract.md`](docs/editor-contract.md) for the first-class editor/IDE direction.
 
 ## Development
 

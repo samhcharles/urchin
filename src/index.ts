@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'fs-extra';
 import * as path from 'node:path';
 
+import { initializeVault, InitMode } from './bootstrap/init';
 import { ClaudeCollector } from './collectors/claude';
 import { CopilotCollector } from './collectors/copilot';
 import { GeminiCollector } from './collectors/gemini';
@@ -62,6 +63,11 @@ async function main() {
     return;
   }
 
+  if (command === 'init') {
+    await init(config, args.slice(1));
+    return;
+  }
+
   if (command === 'status') {
     await status(config);
     return;
@@ -75,6 +81,24 @@ async function dumpThought(config: ReturnType<typeof loadConfig>, text: string) 
   await linker.initialize();
   await appendManualCapture(config, linker, text);
   console.log(`Urchin: capture written to ${config.inboxCapturePath}`);
+}
+
+async function init(config: ReturnType<typeof loadConfig>, args: string[]) {
+  const { flags } = parseFlags(args);
+  const mode: InitMode = flags.mode === 'starter' ? 'starter' : 'existing';
+  const result = await initializeVault({
+    config,
+    mode,
+    vaultRoot: flags.vault,
+  });
+
+  console.log(`Urchin: initialized ${mode} vault wiring at ${result.vaultRoot}`);
+  if (result.created.length > 0) {
+    console.log(`Urchin: created ${result.created.length} path(s)`);
+  }
+  if (result.reused.length > 0) {
+    console.log(`Urchin: reused ${result.reused.length} existing path(s)`);
+  }
 }
 
 async function sync(config: ReturnType<typeof loadConfig>) {

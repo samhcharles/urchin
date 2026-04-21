@@ -18,6 +18,7 @@ The core owns the rules that should stay stable as adapters grow:
 Spikes are adapters and outputs that plug into the core:
 
 - source collectors: Copilot, Claude, Gemini, Git, shell, OpenClaw
+- editor adapters and extension bridges
 - bounded append-only intake for browser or network-fed events
 - archive writers for timelines, project activity, and triage
 
@@ -42,6 +43,15 @@ External producers should write append-only JSONL under the intake root:
 ```
 
 Urchin treats intake events like any other collector output: sanitize, dedupe, route, and then write with provenance preserved.
+
+## Install modes
+
+Urchin should support two safe install modes:
+
+1. `existing` — wire Urchin into a user-chosen vault without overwriting their structure
+2. `starter` — scaffold a minimal vault shape so archive, project, and capture flows have somewhere sane to land
+
+The install layer should stay separate from the sync core. Scaffolding is adoption help, not the brain itself.
 
 ## Development guardrails
 
