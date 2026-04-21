@@ -149,6 +149,9 @@ async function sync(config: ReturnType<typeof loadConfig>) {
   }
 
   console.log(`Urchin: updated ${result.writtenPaths.length} archive note(s) under ${config.archiveRoot}`);
+  if (result.promotedPaths.length > 0) {
+    console.log(`Urchin: updated ${result.promotedPaths.length} promoted note(s) outside the archive.`);
+  }
 }
 
 async function status(config: ReturnType<typeof loadConfig>) {

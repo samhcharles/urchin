@@ -185,8 +185,8 @@ const SPIKE_REPORTS: DoctorSpikeReport[] = [
   },
   {
     id: 'promotion-beyond-archive',
-    status: 'planned',
-    note: 'Promotion into project, decision, and resource surfaces remains intentionally blocked until runtime truth and editor capture are stronger.',
+    status: 'shipped',
+    note: 'Promotion now updates project notes, the Urchin resource note, and explicit decision ledgers through managed provenance-backed sections.',
   },
 ];
 

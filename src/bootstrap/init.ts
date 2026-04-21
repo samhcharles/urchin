@@ -104,6 +104,7 @@ export async function initializeVault(options: InitOptions): Promise<InitResult>
         '- `10-projects/` for active work',
         '- `20-areas/` for ongoing responsibilities',
         '- `30-resources/` for references and AI/system notes',
+        '- `30-resources/decisions.md` for explicit promoted decisions',
         '- `40-archive/urchin/` for synced activity',
       ].join('\n') + '\n',
       config.vaultRoot,
@@ -120,6 +121,14 @@ export async function initializeVault(options: InitOptions): Promise<InitResult>
         '',
         'Start with `urchin status`, then run `urchin sync`.',
       ].join('\n') + '\n',
+      config.vaultRoot,
+      created,
+      reused,
+    );
+
+    await writeIfMissing(
+      path.join(config.vaultRoot, '30-resources', 'decisions.md'),
+      '# Decisions\n\nExplicit promoted decisions can land here.\n',
       config.vaultRoot,
       created,
       reused,

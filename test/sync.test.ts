@@ -115,6 +115,7 @@ test('runSync does not advance state when any collector fails', async () => {
     const state = await fs.readJson(config.statePath);
 
     assert.equal(result.failedCollectors.length, 1);
+    assert.equal(result.promotedPaths.length > 0, true);
     assert.equal(result.writtenPaths.length > 0, true);
     assert.equal(state.lastSuccessfulSyncAt, '2026-04-21T07:00:00.000Z');
     assert.equal(state.lastSyncStartedAt, '2026-04-21T09:00:00.000Z');

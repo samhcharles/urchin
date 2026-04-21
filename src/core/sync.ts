@@ -4,6 +4,7 @@ import { UrchinConfig } from './config';
 import { dedupeEvents } from './dedupe';
 import { sanitize } from './redaction';
 import { loadState, saveState } from './state';
+import { promoteEvents } from '../obsidian/promote';
 import { writeArchive, writeArchiveIndex } from '../obsidian/writer';
 
 export interface SyncCollectorFailure {
@@ -15,6 +16,7 @@ export interface SyncResult {
   eventCount: number;
   failedCollectors: SyncCollectorFailure[];
   lastCheckpoint: string;
+   promotedPaths: string[];
   sinceDate: string;
   writtenPaths: string[];
 }
@@ -83,6 +85,10 @@ export async function runSync(config: UrchinConfig, options: RunSyncOptions): Pr
     sanitizedEvents.length > 0
       ? await writeArchive(config, options.linker, sanitizedEvents)
       : [];
+  const promotedPaths =
+    sanitizedEvents.length > 0
+      ? await promoteEvents(config, options.linker, sanitizedEvents)
+      : [];
 
   await writeArchiveIndex(config);
 
@@ -97,6 +103,7 @@ export async function runSync(config: UrchinConfig, options: RunSyncOptions): Pr
     eventCount: sanitizedEvents.length,
     failedCollectors,
     lastCheckpoint: syncStartedAtIso,
+    promotedPaths,
     sinceDate: sinceDate.toISOString(),
     writtenPaths,
   };

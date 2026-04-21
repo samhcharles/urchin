@@ -41,7 +41,7 @@ function triagePath(config: UrchinConfig, day: string): string {
   return path.join(config.archiveRoot, 'triage', year, month, `${day}.md`);
 }
 
-function relativeToVault(config: UrchinConfig, absolutePath: string): string {
+export function relativeToVault(config: UrchinConfig, absolutePath: string): string {
   return path.relative(config.vaultRoot, absolutePath).replace(/\\/g, '/');
 }
 
@@ -81,7 +81,7 @@ function slugifyProject(project: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-function deriveProject(event: UrchinEvent): string | undefined {
+export function deriveProject(event: UrchinEvent): string | undefined {
   if (event.provenance.repo) {
     return sanitize(event.provenance.repo, 120);
   }
@@ -110,7 +110,7 @@ function deriveProject(event: UrchinEvent): string | undefined {
   return undefined;
 }
 
-function deriveProjectLabel(event: UrchinEvent, linker: Linker): string | undefined {
+export function deriveProjectLabel(event: UrchinEvent, linker: Linker): string | undefined {
   const project = deriveProject(event);
   if (!project) {
     return undefined;

@@ -35,6 +35,12 @@ Urchin v1 writes three archive-grade layers:
 
 This keeps raw activity visible while making it easier to promote useful material into durable project, area, or resource notes later.
 
+Urchin now also supports conservative promotion beyond archive:
+
+- managed `## Urchin Context` sections inside project notes
+- managed sync signal sections inside the Urchin resource note
+- managed decision sections inside `30-resources/decisions.md` when source events are explicitly tagged as decisions
+
 ## Intake contract
 
 External producers should write append-only JSONL under the intake root:
