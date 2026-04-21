@@ -7,6 +7,7 @@ Urchin is a **local-first context bridge**. It is meant to pull scattered AI, sh
 The core owns the rules that should stay stable as adapters grow:
 
 - canonical `UrchinEvent` envelopes
+- async agent lifecycle envelopes for launched/completed/failed work
 - explicit provenance
 - redaction before persistence
 - deterministic note writing

@@ -172,7 +172,7 @@ async function ingest(config: ReturnType<typeof loadConfig>, args: string[]) {
   }
 
   const knownSources: EventSource[] = ['browser', 'claude', 'copilot', 'gemini', 'git', 'manual', 'openclaw', 'shell'];
-  const knownKinds: EventKind[] = ['activity', 'capture', 'code', 'conversation', 'ops'];
+  const knownKinds: EventKind[] = ['activity', 'agent', 'capture', 'code', 'conversation', 'ops'];
   const source = knownSources.includes(flags.source as EventSource) ? (flags.source as EventSource) : 'manual';
   const kind = knownKinds.includes(flags.kind as EventKind) ? (flags.kind as EventKind) : 'capture';
   const targetFile = path.join(config.intakeRoot, `${source}.jsonl`);

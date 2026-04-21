@@ -14,6 +14,7 @@ Urchin is a local-first context bridge that pulls scattered AI and workflow acti
 - `40-archive/urchin/projects/` — project-scoped activity notes when Urchin can infer repo or project context
 - `40-archive/urchin/triage/` — low-confidence capture review notes
 - `40-archive/urchin/index.md` — top-level archive index
+- Copilot background task/agent launches and terminal results now land as first-class archive events when they are present in session-state logs
 
 See [`docs/architecture.md`](docs/architecture.md) for the core-plus-spikes model and intake contract.
 

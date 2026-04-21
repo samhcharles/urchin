@@ -53,7 +53,7 @@ export async function runSync(config: UrchinConfig, options: RunSyncOptions): Pr
   const sanitizedEvents = uniqueEvents.map((event) => ({
     ...event,
     summary: sanitize(event.summary, 240),
-    content: sanitize(event.content),
+    content: sanitize(event.content, event.kind === 'agent' ? 8000 : 1500),
   }));
 
   const writtenPaths =

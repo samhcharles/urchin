@@ -8,7 +8,19 @@ export type EventSource =
   | 'openclaw'
   | 'shell';
 
-export type EventKind = 'activity' | 'capture' | 'code' | 'conversation' | 'ops';
+export type EventKind = 'activity' | 'agent' | 'capture' | 'code' | 'conversation' | 'ops';
+
+export type AsyncAgentStatus = 'launched' | 'running' | 'completed' | 'failed';
+
+export interface AsyncAgentMetadata {
+  agentId: string;
+  agentType?: string;
+  model?: string;
+  parentToolCallId?: string;
+  readToolCallId?: string;
+  status: AsyncAgentStatus;
+  title?: string;
+}
 
 export interface EventProvenance {
   adapter: string;
