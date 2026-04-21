@@ -125,10 +125,10 @@ async function sync(config: ReturnType<typeof loadConfig>) {
   }));
 
   const writtenPaths = await writeArchive(config, linker, sanitizedEvents);
-  await writeArchiveIndex(config, writtenPaths);
+  await writeArchiveIndex(config);
   await saveState(config.statePath, { lastSuccessfulSyncAt: new Date().toISOString() });
 
-  console.log(`Urchin: updated ${writtenPaths.length} timeline note(s) under ${config.archiveRoot}`);
+  console.log(`Urchin: updated ${writtenPaths.length} archive note(s) under ${config.archiveRoot}`);
 }
 
 async function status(config: ReturnType<typeof loadConfig>) {

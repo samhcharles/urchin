@@ -1,0 +1,106 @@
+import assert from 'node:assert/strict';
+import * as fs from 'fs-extra';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import test from 'node:test';
+
+import { UrchinConfig } from '../src/core/config';
+import { writeArchive, writeArchiveIndex } from '../src/obsidian/writer';
+import { Linker } from '../src/synthesis/linker';
+import { UrchinEvent } from '../src/types';
+
+async function withTempVault(run: (config: UrchinConfig, linker: Linker) => Promise<void>) {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'urchin-writer-'));
+  const vaultRoot = path.join(root, 'vault');
+  const config: UrchinConfig = {
+    archiveIndexPath: path.join(vaultRoot, '40-archive', 'urchin', 'index.md'),
+    archiveRoot: path.join(vaultRoot, '40-archive', 'urchin'),
+    claudeHistoryFile: path.join(root, '.claude', 'history.jsonl'),
+    copilotSessionRoot: path.join(root, '.copilot', 'session-state'),
+    geminiTmpRoot: path.join(root, '.gemini', 'tmp'),
+    inboxCapturePath: path.join(vaultRoot, '00-inbox', 'urchin-capture.md'),
+    intakeRoot: path.join(root, 'intake'),
+    openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
+    reposRoots: [path.join(root, 'dev')],
+    shellHistoryFile: path.join(root, '.bash_history'),
+    statePath: path.join(root, '.state', 'urchin.json'),
+    vaultRoot,
+  };
+
+  await fs.ensureDir(vaultRoot);
+  await fs.ensureDir(path.join(vaultRoot, '10-projects'));
+  await fs.writeFile(path.join(vaultRoot, '10-projects', 'urchin.md'), '# Urchin\n', 'utf8');
+
+  const linker = new Linker(vaultRoot);
+  await linker.initialize();
+
+  try {
+    await run(config, linker);
+  } finally {
+    await fs.remove(root);
+  }
+}
+
+function event(overrides: Partial<UrchinEvent> = {}): UrchinEvent {
+  return {
+    id: 'evt-1',
+    kind: 'code',
+    source: 'git',
+    timestamp: '2026-04-21T08:00:00.000Z',
+    summary: 'feat: build project views',
+    content: 'feat: build project views',
+    tags: [],
+    metadata: {},
+    provenance: {
+      adapter: 'git-log',
+      location: '/tmp/repo',
+      scope: 'local',
+      repo: 'urchin',
+    },
+    ...overrides,
+  };
+}
+
+test('writeArchive emits daily, project, triage, and index notes', async () => {
+  await withTempVault(async (config, linker) => {
+    const written = await writeArchive(config, linker, [
+      event(),
+      event({
+        id: 'evt-2',
+        source: 'browser',
+        kind: 'capture',
+        timestamp: '2026-04-21T08:05:00.000Z',
+        summary: 'Saved a browser note',
+        content: 'Saved a browser note for later',
+        provenance: {
+          adapter: 'append-only-intake',
+          location: '/tmp/intake/browser.jsonl',
+          scope: 'network',
+        },
+      }),
+    ]);
+    await writeArchiveIndex(config);
+
+    assert.equal(written.length, 3);
+
+    const dailyPath = path.join(config.archiveRoot, 'daily', '2026', '04', '2026-04-21.md');
+    const projectPath = path.join(config.archiveRoot, 'projects', 'urchin', '2026', '04', '2026-04-21.md');
+    const triagePath = path.join(config.archiveRoot, 'triage', '2026', '04', '2026-04-21.md');
+    const indexPath = config.archiveIndexPath;
+
+    const [daily, project, triage, index] = await Promise.all([
+      fs.readFile(dailyPath, 'utf8'),
+      fs.readFile(projectPath, 'utf8'),
+      fs.readFile(triagePath, 'utf8'),
+      fs.readFile(indexPath, 'utf8'),
+    ]);
+
+    assert.match(daily, /## Projects/);
+    assert.match(daily, /\[\[urchin\]\] x1/);
+    assert.match(project, /Urchin Project Activity — urchin — 2026-04-21/);
+    assert.match(triage, /Urchin Triage — 2026-04-21/);
+    assert.match(index, /## Daily Timelines/);
+    assert.match(index, /## Project Activity/);
+    assert.match(index, /## Triage/);
+  });
+});
