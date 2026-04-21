@@ -14,6 +14,7 @@ async function withTempRepo(run: (config: UrchinConfig, repoPath: string) => Pro
   const repoPath = path.join(reposRoot, 'urchin');
 
   const config: UrchinConfig = {
+    agentEventsPath: path.join(root, '.local', 'share', 'urchin', 'agents', 'events.jsonl'),
     archiveIndexPath: path.join(root, 'vault', '40-archive', 'urchin', 'index.md'),
     archiveRoot: path.join(root, 'vault', '40-archive', 'urchin'),
     claudeHistoryFile: path.join(root, '.claude', 'history.jsonl'),
@@ -24,9 +25,13 @@ async function withTempRepo(run: (config: UrchinConfig, repoPath: string) => Pro
     openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     reposRoots: [reposRoot],
+    shellIgnorePrefixes: ['cd', 'ls'],
+    shellMinCommandLength: 8,
     shellHistoryFile: path.join(root, '.bash_history'),
     statePath: path.join(root, '.state', 'urchin.json'),
+    timerCadence: '5m',
     vaultRoot: path.join(root, 'vault'),
+    vscodeWorkspaceAliasesPath: path.join(root, '.config', 'urchin', 'vscode-workspaces.json'),
     vscodeEventsPath: path.join(root, '.local', 'share', 'urchin', 'editors', 'vscode', 'events.jsonl'),
   };
 
@@ -62,5 +67,14 @@ test('GitCollector collects commits without shell interpolation', async () => {
     assert.equal(events[0]?.source, 'git');
     assert.equal(events[0]?.provenance.repo, 'urchin');
     assert.match(events[0]?.summary ?? '', /initial archive hardening/);
+  });
+});
+
+test('GitCollector respects configured git author', async () => {
+  await withTempRepo(async (config) => {
+    const collector = new GitCollector({ ...config, gitAuthor: 'samhcharles' });
+    const events = await collector.collect(new Date('2026-04-21T07:00:00.000Z'));
+
+    assert.equal(events.length, 1);
   });
 });

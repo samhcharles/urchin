@@ -8,9 +8,12 @@ test('loadConfig defaults to the brain vault and archive paths', () => {
   delete process.env.URCHIN_VAULT_ROOT;
 
   const config = loadConfig();
+  assert.match(config.agentEventsPath, /urchin[\/\\]agents[\/\\]events\.jsonl$/);
   assert.match(config.vaultRoot, /brain$/);
   assert.match(config.archiveRoot, /40-archive[\/\\]urchin$/);
+  assert.equal(config.timerCadence, '5m');
   assert.match(config.vscodeEventsPath, /urchin[\/\\]editors[\/\\]vscode[\/\\]events\.jsonl$/);
+  assert.match(config.vscodeWorkspaceAliasesPath, /urchin[\/\\]vscode-workspaces\.json$/);
 
   if (originalVaultRoot) {
     process.env.URCHIN_VAULT_ROOT = originalVaultRoot;

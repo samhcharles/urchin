@@ -27,6 +27,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the core-plus-spikes mode
 - `urchin` or `urchin sync` — collect recent activity and write timeline notes
 - `urchin dump "text"` — append a manual capture into the Obsidian inbox
 - `urchin ingest --source browser --kind capture --scope network "captured text"` — append an external/browser-style event into the bounded intake queue
+- `urchin ingest-agent --agent codex --workspace urchin --status completed "message"` — append a generic local agent event into the dedicated agent bridge queue
 - `urchin ingest-vscode --workspace /repo --session chat-1 --file /repo/src/app.ts --role assistant "message"` — append a VS Code bridge event into the dedicated editor queue
 - `urchin status` — show resolved config and sync state
 - `urchin doctor` — show blunt runtime diagnostics: what is shipped, what is reachable, what last ran, and what is still only planned
@@ -46,6 +47,7 @@ Urchin defaults to the local paths used in this workflow, but every important pa
 
 | Variable | Default |
 | --- | --- |
+| `URCHIN_AGENT_EVENTS_PATH` | `~/.local/share/urchin/agents/events.jsonl` |
 | `URCHIN_VAULT_ROOT` | `~/brain` |
 | `URCHIN_ARCHIVE_ROOT` | `~/brain/40-archive/urchin` |
 | `URCHIN_STATE_PATH` | `~/.local/state/urchin/state.json` |
@@ -56,8 +58,13 @@ Urchin defaults to the local paths used in this workflow, but every important pa
 | `URCHIN_GEMINI_TMP_ROOT` | `~/.gemini/tmp` |
 | `URCHIN_OPENCLAW_COMMANDS_LOG` | `~/.openclaw/logs/commands.log` |
 | `URCHIN_PROJECT_ALIAS_PATH` | `~/.config/urchin/project-aliases.json` |
+| `URCHIN_GIT_AUTHOR` | unset (falls back to repo `git config user.name`) |
 | `URCHIN_SHELL_HISTORY_FILE` | `~/.bash_history` |
+| `URCHIN_SHELL_IGNORE_PREFIXES` | `cd,ls,pwd,clear,history,exit` |
+| `URCHIN_SHELL_MIN_COMMAND_LENGTH` | `8` |
 | `URCHIN_REPOS_ROOTS` | `~/dev,~/repos` |
+| `URCHIN_TIMER_CADENCE` | `5m` |
+| `URCHIN_VSCODE_WORKSPACE_ALIASES_PATH` | `~/.config/urchin/vscode-workspaces.json` |
 | `URCHIN_VSCODE_EVENTS_PATH` | `~/.local/share/urchin/editors/vscode/events.jsonl` |
 
 For day-to-day use, start with `urchin setup-personal --enable true`, then use `urchin doctor` to confirm the timer, reachable sources, and runtime state.
@@ -83,12 +90,39 @@ That writes:
 
 The timer keeps `urchin sync` moving in the background on a steady cadence, and the note gives you one place in the vault to check the current working setup.
 
+If you want faster VS Code capture without retyping full workspace paths, add aliases in `~/.config/urchin/vscode-workspaces.json`:
+
+```json
+{
+  "urchin": "/home/samhc/dev/urchin"
+}
+```
+
+Then you can do:
+
+```bash
+urchin ingest-vscode --workspace urchin "Shipped a stronger sync summary"
+```
+
+The same local-first bridge pattern now applies to unsupported or custom agent runtimes:
+
+```bash
+urchin ingest-agent \
+  --agent codex \
+  --workspace urchin \
+  --status completed \
+  --model gpt-5.4 \
+  "Finished the collector pass"
+```
+
+That is not fake native Codex support. It is a real append-only bridge contract that lets Codex-style or custom agents land in the same sync pipeline once they can emit durable local events.
+
 Urchin now supports two install modes:
 
 - **existing** — create only the inbox/archive wiring Urchin needs inside an existing vault
 - **starter** — scaffold a minimal vault structure for people adopting Urchin as the beginning of a second brain
 
-See [`docs/editor-contract.md`](docs/editor-contract.md) for the first-class editor/IDE direction.
+See [`docs/editor-contract.md`](docs/editor-contract.md) for the first-class editor/IDE direction and [`docs/agent-contract.md`](docs/agent-contract.md) for the generic agent bridge contract.
 
 ## Development
 

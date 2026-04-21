@@ -145,6 +145,26 @@ function renderEvent(linker: Linker, event: UrchinEvent): string {
     lines.push(`- **Editor:** \`${sanitize(editor, 120)}\``);
   }
 
+  const agent = typeof event.metadata.agent === 'string' ? event.metadata.agent : undefined;
+  if (agent) {
+    lines.push(`- **Agent:** \`${sanitize(agent, 120)}\``);
+  }
+
+  const agentType = typeof event.metadata.agentType === 'string' ? event.metadata.agentType : undefined;
+  if (agentType) {
+    lines.push(`- **Agent type:** \`${sanitize(agentType, 120)}\``);
+  }
+
+  const model = typeof event.metadata.model === 'string' ? event.metadata.model : undefined;
+  if (model) {
+    lines.push(`- **Model:** \`${sanitize(model, 120)}\``);
+  }
+
+  const status = typeof event.metadata.status === 'string' ? event.metadata.status : undefined;
+  if (status) {
+    lines.push(`- **Status:** \`${sanitize(status, 120)}\``);
+  }
+
   const workspacePath = typeof event.metadata.workspacePath === 'string' ? event.metadata.workspacePath : undefined;
   if (workspacePath) {
     lines.push(`- **Workspace:** \`${sanitize(workspacePath, 220)}\``);

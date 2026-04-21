@@ -8,13 +8,13 @@ import { Collector, EventKind, EventSource, UrchinEvent } from '../types';
 
 function toSource(value: unknown): EventSource {
   const normalized = typeof value === 'string' ? value : 'manual';
-  const knownSources: EventSource[] = ['browser', 'claude', 'copilot', 'gemini', 'git', 'manual', 'openclaw', 'shell', 'vscode'];
+  const knownSources: EventSource[] = ['agent', 'browser', 'claude', 'copilot', 'gemini', 'git', 'manual', 'openclaw', 'shell', 'vscode'];
   return knownSources.includes(normalized as EventSource) ? (normalized as EventSource) : 'manual';
 }
 
 function toKind(value: unknown): EventKind {
   const normalized = typeof value === 'string' ? value : 'capture';
-  const knownKinds: EventKind[] = ['activity', 'capture', 'code', 'conversation', 'ops'];
+  const knownKinds: EventKind[] = ['activity', 'agent', 'capture', 'code', 'conversation', 'ops'];
   return knownKinds.includes(normalized as EventKind) ? (normalized as EventKind) : 'capture';
 }
 

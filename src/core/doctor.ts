@@ -57,8 +57,13 @@ export interface DoctorReport {
     stateFileExists: boolean;
   };
   sync: {
+    lastPromotionNotReason: string | null;
+    lastSyncCollectedCount: number;
+    lastSyncDedupedCount: number;
+    lastSyncPromotedCount: number;
     lastSuccessfulSyncAt: string | null;
     lastSyncStartedAt: string | null;
+    lastSyncWrittenCount: number;
     connectedSourceCount: number;
     shippedSourceCount: number;
   };
@@ -81,6 +86,14 @@ interface SourceSpec {
 }
 
 const SOURCE_SPECS: SourceSpec[] = [
+  {
+    source: 'agent',
+    label: 'Generic agent bridge collector',
+    category: 'collector',
+    note: 'Reads explicit local agent bridge events for Codex-style tools, custom agents, and unsupported runtimes.',
+    paths: (config) => [config.agentEventsPath],
+    status: ([file]) => (file?.exists ? 'ready' : 'missing'),
+  },
   {
     source: 'browser',
     label: 'Generic intake queue',
@@ -191,6 +204,11 @@ const SPIKE_REPORTS: DoctorSpikeReport[] = [
     id: 'editor-vscode',
     status: 'shipped',
     note: 'VS Code / VSCodium now has a shipped local bridge contract through the dedicated queue file and collector.',
+  },
+  {
+    id: 'agent-bridge',
+    status: 'shipped',
+    note: 'A generic local agent bridge now lets Codex-style or custom agents land in the same sync pipeline without fake native support claims.',
   },
   {
     id: 'editor-jetbrains',
@@ -312,8 +330,13 @@ export async function buildDoctorReport(
       stateFileExists,
     },
     sync: {
+      lastPromotionNotReason: state.lastPromotionNotReason ?? null,
+      lastSyncCollectedCount: state.lastSyncCollectedCount ?? 0,
+      lastSyncDedupedCount: state.lastSyncDedupedCount ?? 0,
+      lastSyncPromotedCount: state.lastSyncPromotedCount ?? 0,
       lastSuccessfulSyncAt: state.lastSuccessfulSyncAt ?? null,
       lastSyncStartedAt: state.lastSyncStartedAt ?? null,
+      lastSyncWrittenCount: state.lastSyncWrittenCount ?? 0,
       connectedSourceCount,
       shippedSourceCount: sources.length,
     },

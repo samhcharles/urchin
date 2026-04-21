@@ -4,6 +4,7 @@ import { writeJsonAtomic } from './io';
 import { EventSource } from '../types';
 
 export interface SourceSyncState {
+  collectedCount?: number;
   eventCount?: number;
   lastError?: string;
   lastRunAt?: string;
@@ -11,8 +12,13 @@ export interface SourceSyncState {
 }
 
 export interface UrchinState {
+  lastPromotionNotReason?: string;
+  lastSyncCollectedCount?: number;
+  lastSyncDedupedCount?: number;
+  lastSyncPromotedCount?: number;
   lastSuccessfulSyncAt?: string;
   lastSyncStartedAt?: string;
+  lastSyncWrittenCount?: number;
   sources?: Partial<Record<EventSource, SourceSyncState>>;
 }
 

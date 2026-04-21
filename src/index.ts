@@ -2,10 +2,12 @@
 
 import { randomUUID } from 'node:crypto';
 import * as fs from 'fs-extra';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { initializeVault, InitMode } from './bootstrap/init';
 import { setupPersonalWorkflow } from './bootstrap/personal';
+import { AgentCollector } from './collectors/agent';
 import { ClaudeCollector } from './collectors/claude';
 import { CopilotCollector } from './collectors/copilot';
 import { GeminiCollector } from './collectors/gemini';
@@ -68,6 +70,11 @@ async function main() {
 
   if (command === 'ingest-vscode') {
     await ingestVSCode(config, args.slice(1));
+    return;
+  }
+
+  if (command === 'ingest-agent') {
+    await ingestAgent(config, args.slice(1));
     return;
   }
 
@@ -138,16 +145,19 @@ async function setupPersonal(config: ReturnType<typeof loadConfig>, args: string
   const { flags } = parseFlags(args);
   const mode: InitMode = flags.mode === 'starter' ? 'starter' : 'existing';
   const effectiveConfig = applyVaultOverride(config, flags.vault);
+  const cadence = flags.cadence ?? effectiveConfig.timerCadence;
+  const personalConfig = { ...effectiveConfig, timerCadence: cadence };
 
   await initializeVault({
-    config: effectiveConfig,
+    config: personalConfig,
     mode,
     vaultRoot: flags.vault,
   });
 
   const result = await setupPersonalWorkflow({
-    config: effectiveConfig,
+    config: personalConfig,
     enableSystemd: flags.enable === 'true',
+    timerCadence: cadence,
   });
 
   console.log(`Urchin: personal workflow setup written to ${result.written.length} path(s).`);
@@ -162,8 +172,30 @@ async function setupPersonal(config: ReturnType<typeof loadConfig>, args: string
   console.log(`Urchin: timer active: ${result.state.timerActive === null ? 'unknown' : result.state.timerActive}`);
 }
 
+function formatSyncSummary(result: Awaited<ReturnType<typeof runSync>>): string[] {
+  const lines = [
+    `Urchin: collected ${result.collectedCount} event(s), deduped to ${result.dedupedCount}, wrote ${result.writtenCount}.`,
+    `Urchin: promotion wrote ${result.promotedCount} note(s) (${result.promotionSummary.projectNotes} project, ${result.promotionSummary.resourceNotes} resource, decisions from ${result.promotionSummary.decisions} event(s)).`,
+  ];
+
+  if (result.promotionNotReason) {
+    lines.push(`Urchin: promotion skipped broader surfaces because ${result.promotionNotReason}.`);
+  }
+
+  for (const source of result.sourceBreakdown.sort((a, b) => a.source.localeCompare(b.source))) {
+    lines.push(
+      source.error
+        ? `Urchin: ${source.source} failed (${source.error}).`
+        : `Urchin: ${source.source} collected ${source.collectedCount} event(s).`,
+    );
+  }
+
+  return lines;
+}
+
 async function sync(config: ReturnType<typeof loadConfig>) {
   const collectors: Collector[] = [
+    new AgentCollector(config),
     new IntakeCollector(config),
     new CopilotCollector(config),
     new GeminiCollector(config),
@@ -193,6 +225,9 @@ async function sync(config: ReturnType<typeof loadConfig>) {
   }
 
   if (result.eventCount === 0) {
+    for (const line of formatSyncSummary(result)) {
+      console.log(line);
+    }
     console.log('Urchin: no new events to sync.');
     return;
   }
@@ -201,6 +236,9 @@ async function sync(config: ReturnType<typeof loadConfig>) {
   if (result.promotedPaths.length > 0) {
     console.log(`Urchin: updated ${result.promotedPaths.length} promoted note(s) outside the archive.`);
   }
+  for (const line of formatSyncSummary(result)) {
+    console.log(line);
+  }
 }
 
 async function status(config: ReturnType<typeof loadConfig>) {
@@ -208,6 +246,7 @@ async function status(config: ReturnType<typeof loadConfig>) {
   console.log(
     JSON.stringify(
       {
+        agentEventsPath: config.agentEventsPath,
         archiveRoot: config.archiveRoot,
         claudeHistoryFile: config.claudeHistoryFile,
         copilotSessionRoot: config.copilotSessionRoot,
@@ -242,7 +281,7 @@ async function ingest(config: ReturnType<typeof loadConfig>, args: string[]) {
     process.exit(1);
   }
 
-  const knownSources: EventSource[] = ['browser', 'claude', 'copilot', 'gemini', 'git', 'manual', 'openclaw', 'shell', 'vscode'];
+  const knownSources: EventSource[] = ['agent', 'browser', 'claude', 'copilot', 'gemini', 'git', 'manual', 'openclaw', 'shell', 'vscode'];
   const knownKinds: EventKind[] = ['activity', 'agent', 'capture', 'code', 'conversation', 'ops'];
   const source = knownSources.includes(flags.source as EventSource) ? (flags.source as EventSource) : 'manual';
   const kind = knownKinds.includes(flags.kind as EventKind) ? (flags.kind as EventKind) : 'capture';
@@ -271,14 +310,14 @@ async function ingest(config: ReturnType<typeof loadConfig>, args: string[]) {
 async function ingestVSCode(config: ReturnType<typeof loadConfig>, args: string[]) {
   const { flags, rest } = parseFlags(args);
   const content = rest.join(' ').trim();
-  const workspacePath = flags.workspace;
-  const sessionId = flags.session;
-  if (!content || !workspacePath || !sessionId) {
+  const workspacePath = await resolveWorkspacePath(config, flags.workspace);
+  if (!content || !workspacePath) {
     console.error(
-      'Usage: urchin ingest-vscode --workspace /path/to/workspace --session session-id [--role user|assistant] [--file /path/to/file] [--title "Chat title"] "message"',
+      'Usage: urchin ingest-vscode --workspace /path/to/workspace-or-alias [--session session-id] [--role user|assistant] [--file /path/to/file] [--title "Chat title"] "message"',
     );
     process.exit(1);
   }
+  const sessionId = flags.session ?? deriveVSCodeSessionId(workspacePath, flags.title);
 
   const event = {
     id: randomUUID(),
@@ -297,6 +336,82 @@ async function ingestVSCode(config: ReturnType<typeof loadConfig>, args: string[
   await fs.ensureDir(path.dirname(config.vscodeEventsPath));
   await fs.appendFile(config.vscodeEventsPath, `${JSON.stringify(event)}\n`, 'utf8');
   console.log(`Urchin: ingested vscode event into ${config.vscodeEventsPath}`);
+}
+
+async function ingestAgent(config: ReturnType<typeof loadConfig>, args: string[]) {
+  const { flags, rest } = parseFlags(args);
+  const content = rest.join(' ').trim();
+  const agent = flags.agent?.trim();
+  const workspacePath = await resolveWorkspacePath(config, flags.workspace);
+  if (!content || !agent) {
+    console.error(
+      'Usage: urchin ingest-agent --agent codex|custom-name [--workspace /path/to/workspace-or-alias] [--session session-id] [--status launched|running|completed|failed] [--model model-name] [--file /path/to/file] [--title "Task title"] "message"',
+    );
+    process.exit(1);
+  }
+
+  const sessionId = flags.session ?? deriveAgentSessionId(agent, workspacePath, flags.title);
+  const event = {
+    id: randomUUID(),
+    agent,
+    agentType: flags.type,
+    content,
+    filePath: flags.file,
+    kind: flags.kind === 'conversation' ? 'conversation' : 'agent',
+    model: flags.model,
+    role: flags.role,
+    sessionId,
+    status: flags.status,
+    summary: flags.summary,
+    timestamp: new Date().toISOString(),
+    title: flags.title,
+    workspacePath,
+  };
+
+  await fs.ensureDir(path.dirname(config.agentEventsPath));
+  await fs.appendFile(config.agentEventsPath, `${JSON.stringify(event)}\n`, 'utf8');
+  console.log(`Urchin: ingested agent event into ${config.agentEventsPath}`);
+}
+
+function deriveVSCodeSessionId(workspacePath: string, title?: string): string {
+  const base = title?.trim() || path.basename(workspacePath) || 'vscode';
+  return `${base.replace(/[^a-zA-Z0-9._-]+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}`;
+}
+
+function deriveAgentSessionId(agent: string, workspacePath?: string, title?: string): string {
+  const workspaceBase = workspacePath ? path.basename(workspacePath) : '';
+  const base = title?.trim() || workspaceBase || agent || 'agent';
+  return `${base.replace(/[^a-zA-Z0-9._-]+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}`;
+}
+
+async function resolveWorkspacePath(config: ReturnType<typeof loadConfig>, workspaceArg?: string): Promise<string | undefined> {
+  if (!workspaceArg) {
+    return undefined;
+  }
+
+  const expanded = workspaceArg === '~' || workspaceArg.startsWith('~/')
+    ? path.join(os.homedir(), workspaceArg === '~' ? '' : workspaceArg.slice(2))
+    : workspaceArg;
+  if (expanded.startsWith('/')) {
+    return expanded;
+  }
+
+  const aliases = (await fs.pathExists(config.vscodeWorkspaceAliasesPath))
+    ? await fs.readJson(config.vscodeWorkspaceAliasesPath).catch(() => ({}))
+    : {};
+  const resolved = aliases?.[workspaceArg];
+  if (typeof resolved === 'string' && resolved.trim()) {
+    return resolved;
+  }
+
+  for (const repoRoot of config.reposRoots) {
+    const candidate = path.join(repoRoot, workspaceArg);
+    if (await fs.pathExists(candidate)) {
+      return candidate;
+    }
+  }
+
+  return workspaceArg;
 }
 
 main().catch((error) => {

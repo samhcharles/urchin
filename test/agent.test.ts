@@ -4,15 +4,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import test from 'node:test';
 
+import { AgentCollector } from '../src/collectors/agent';
 import { UrchinConfig } from '../src/core/config';
-import { Linker } from '../src/synthesis/linker';
-import { VSCodeCollector } from '../src/collectors/vscode';
 import { writeArchive } from '../src/obsidian/writer';
+import { Linker } from '../src/synthesis/linker';
 
-async function withTempHarness(
-  run: (config: UrchinConfig, linker: Linker) => Promise<void>,
-) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'urchin-vscode-'));
+async function withTempHarness(run: (config: UrchinConfig, linker: Linker) => Promise<void>) {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'urchin-agent-'));
   const vaultRoot = path.join(root, 'vault');
   const config: UrchinConfig = {
     agentEventsPath: path.join(root, '.local', 'share', 'urchin', 'agents', 'events.jsonl'),
@@ -37,7 +35,7 @@ async function withTempHarness(
   };
 
   await fs.ensureDir(path.join(vaultRoot, '10-projects'));
-  await fs.writeFile(path.join(vaultRoot, '10-projects', 'openclaw.md'), '# OpenClaw\n', 'utf8');
+  await fs.writeFile(path.join(vaultRoot, '10-projects', 'urchin.md'), '# Urchin\n', 'utf8');
 
   const linker = new Linker(vaultRoot, config.projectAliasPath);
   await linker.initialize();
@@ -49,63 +47,66 @@ async function withTempHarness(
   }
 }
 
-test('VSCodeCollector captures workspace-aware editor events and routes them into project activity', async () => {
+test('AgentCollector captures generic local agent events and routes them into project activity', async () => {
   await withTempHarness(async (config, linker) => {
-    await fs.ensureDir(path.dirname(config.vscodeEventsPath));
+    await fs.ensureDir(path.dirname(config.agentEventsPath));
     await fs.writeFile(
-      config.vscodeEventsPath,
+      config.agentEventsPath,
       `${JSON.stringify({
-        id: 'vs-1',
+        id: 'agent-1',
+        agent: 'codex',
+        agentType: 'general-purpose',
+        status: 'completed',
+        model: 'gpt-5.4',
         timestamp: '2026-04-21T08:10:00.000Z',
-        sessionId: 'chat-1',
-        workspacePath: '/home/samhc/dev/openclaw-workspace-braindump',
-        filePath: '/home/samhc/dev/openclaw-workspace-braindump/src/app.ts',
-        role: 'assistant',
-        title: 'Copilot Chat',
-        content: 'Explained how the bridge routes editor context into the vault.',
+        sessionId: 'urchin-2026-04-21',
+        workspacePath: '/home/samhc/dev/urchin',
+        filePath: '/home/samhc/dev/urchin/src/index.ts',
+        title: 'Collector pass',
+        content: 'Finished the collector pass cleanly.',
       })}\n`,
       'utf8',
     );
 
-    const collector = new VSCodeCollector(config);
+    const collector = new AgentCollector(config);
     const events = await collector.collect(new Date('2026-04-21T08:00:00.000Z'));
 
     assert.equal(events.length, 1);
-    assert.equal(events[0]?.source, 'vscode');
-    assert.equal(events[0]?.provenance.repo, 'openclaw-workspace-braindump');
-    assert.equal(events[0]?.metadata.workspacePath, '/home/samhc/dev/openclaw-workspace-braindump');
+    assert.equal(events[0]?.source, 'agent');
+    assert.equal(events[0]?.metadata.agent, 'codex');
+    assert.equal(events[0]?.provenance.repo, 'urchin');
 
     await writeArchive(config, linker, events);
 
-    const projectPath = path.join(config.archiveRoot, 'projects', 'openclaw', '2026', '04', '2026-04-21.md');
+    const projectPath = path.join(config.archiveRoot, 'projects', 'urchin', '2026', '04', '2026-04-21.md');
     const project = await fs.readFile(projectPath, 'utf8');
 
-    assert.match(project, /vscode \/ conversation/);
-    assert.match(project, /\*\*Editor:\*\* `vscode`/);
-    assert.match(project, /\*\*Workspace:\*\* `\/home\/samhc\/dev\/openclaw-workspace-braindump`/);
-    assert.match(project, /\*\*File:\*\* `\/home\/samhc\/dev\/openclaw-workspace-braindump\/src\/app.ts`/);
-    assert.match(project, /\*\*Project:\*\* \[\[openclaw\]\]/);
+    assert.match(project, /agent \/ agent/);
+    assert.match(project, /\*\*Agent:\*\* `codex`/);
+    assert.match(project, /\*\*Agent type:\*\* `general-purpose`/);
+    assert.match(project, /\*\*Model:\*\* `gpt-5.4`/);
+    assert.match(project, /\*\*Status:\*\* `completed`/);
+    assert.match(project, /\*\*Workspace:\*\* `\/home\/samhc\/dev\/urchin`/);
+    assert.match(project, /\*\*Project:\*\* \[\[urchin\]\]/);
   });
 });
 
-test('VSCodeCollector allows derived session ids and alias-style workspace values upstream', async () => {
+test('AgentCollector ignores malformed or incomplete queue entries', async () => {
   await withTempHarness(async (config) => {
-    await fs.ensureDir(path.dirname(config.vscodeEventsPath));
+    await fs.ensureDir(path.dirname(config.agentEventsPath));
     await fs.writeFile(
-      config.vscodeEventsPath,
-      `${JSON.stringify({
-        id: 'vs-2',
-        timestamp: '2026-04-21T08:10:00.000Z',
-        sessionId: 'openclaw-workspace-braindump-2026-04-21',
-        workspacePath: '/home/samhc/dev/openclaw-workspace-braindump',
-        content: 'Quick editor capture.',
-      })}\n`,
+      config.agentEventsPath,
+      [
+        JSON.stringify({ agent: 'codex', content: '', timestamp: '2026-04-21T08:10:00.000Z' }),
+        JSON.stringify({ content: 'Missing agent name', timestamp: '2026-04-21T08:11:00.000Z' }),
+        '{not-json}',
+      ].join('\n'),
       'utf8',
     );
 
-    const collector = new VSCodeCollector(config);
+    const collector = new AgentCollector(config);
     const events = await collector.collect(new Date('2026-04-21T08:00:00.000Z'));
 
-    assert.equal(events[0]?.provenance.sessionId, 'openclaw-workspace-braindump-2026-04-21');
+    assert.equal(events.length, 0);
   });
 });

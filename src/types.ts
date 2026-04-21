@@ -1,4 +1,5 @@
 export type EventSource =
+  | 'agent'
   | 'browser'
   | 'claude'
   | 'copilot'

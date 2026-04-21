@@ -12,12 +12,30 @@ export interface SyncCollectorFailure {
   error: unknown;
 }
 
+export interface SyncSourceBreakdown {
+  collectedCount: number;
+  error?: string;
+  source: Collector['name'];
+}
+
 export interface SyncResult {
+  collectedCount: number;
+  dedupedCount: number;
   eventCount: number;
   failedCollectors: SyncCollectorFailure[];
   lastCheckpoint: string;
-   promotedPaths: string[];
+  promotedCount: number;
+  promotedPaths: string[];
+  promotionNotReason?: string;
+  promotionSummary: {
+    decisions: number;
+    projectEvents: number;
+    projectNotes: number;
+    resourceNotes: number;
+  };
   sinceDate: string;
+  sourceBreakdown: SyncSourceBreakdown[];
+  writtenCount: number;
   writtenPaths: string[];
 }
 
@@ -50,13 +68,19 @@ export async function runSync(config: UrchinConfig, options: RunSyncOptions): Pr
   let allEvents: UrchinEvent[] = [];
   const failedCollectors: SyncCollectorFailure[] = [];
   const sources = { ...(state.sources ?? {}) };
+  const sourceBreakdown: SyncSourceBreakdown[] = [];
 
   for (const collector of options.collectors) {
     try {
       const events = await collector.collect(sinceDate);
       allEvents.push(...events);
+      sourceBreakdown.push({
+        collectedCount: events.length,
+        source: collector.name,
+      });
       sources[collector.name] = {
         ...sources[collector.name],
+        collectedCount: events.length,
         eventCount: events.length,
         lastError: undefined,
         lastRunAt: syncStartedAtIso,
@@ -64,8 +88,14 @@ export async function runSync(config: UrchinConfig, options: RunSyncOptions): Pr
       };
     } catch (error) {
       failedCollectors.push({ collector: collector.name, error });
+      sourceBreakdown.push({
+        collectedCount: 0,
+        error: formatError(error),
+        source: collector.name,
+      });
       sources[collector.name] = {
         ...sources[collector.name],
+        collectedCount: 0,
         eventCount: 0,
         lastError: formatError(error),
         lastRunAt: syncStartedAtIso,
@@ -78,33 +108,59 @@ export async function runSync(config: UrchinConfig, options: RunSyncOptions): Pr
   const sanitizedEvents = uniqueEvents.map((event) => ({
     ...event,
     summary: sanitize(event.summary, 240),
-    content: sanitize(event.content, event.kind === 'agent' ? 8000 : 1500),
+      content: sanitize(event.content, event.kind === 'agent' ? 8000 : 1500),
   }));
+  const collectedCount = allEvents.length;
+  const dedupedCount = uniqueEvents.length;
+  const writtenCount = sanitizedEvents.length;
 
   const writtenPaths =
     sanitizedEvents.length > 0
       ? await writeArchive(config, options.linker, sanitizedEvents)
       : [];
-  const promotedPaths =
+  const promotionResult =
     sanitizedEvents.length > 0
       ? await promoteEvents(config, options.linker, sanitizedEvents)
-      : [];
+      : {
+          promotedCount: 0,
+          promotedPaths: [],
+          promotionSummary: undefined,
+          summary: {
+            decisions: 0,
+            projectEvents: 0,
+            projectNotes: 0,
+            resourceNotes: 0,
+          },
+          whyNot: 'no events written',
+        };
 
   await writeArchiveIndex(config);
 
   await saveState(config.statePath, {
     ...state,
+    lastPromotionNotReason: promotionResult.whyNot,
+    lastSyncCollectedCount: collectedCount,
+    lastSyncDedupedCount: dedupedCount,
+    lastSyncPromotedCount: promotionResult.promotedCount,
     lastSyncStartedAt: syncStartedAtIso,
+    lastSyncWrittenCount: writtenCount,
     ...(failedCollectors.length === 0 ? { lastSuccessfulSyncAt: syncStartedAtIso } : {}),
     sources,
   });
 
   return {
+    collectedCount,
+    dedupedCount,
     eventCount: sanitizedEvents.length,
     failedCollectors,
     lastCheckpoint: syncStartedAtIso,
-    promotedPaths,
+    promotedCount: promotionResult.promotedCount,
+    promotedPaths: promotionResult.promotedPaths,
+    promotionNotReason: promotionResult.whyNot,
+    promotionSummary: promotionResult.summary,
     sinceDate: sinceDate.toISOString(),
+    sourceBreakdown,
+    writtenCount,
     writtenPaths,
   };
 }

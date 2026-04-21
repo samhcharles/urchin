@@ -29,6 +29,7 @@ export interface PersonalSetupOptions {
   homeRoot?: string;
   nodePath?: string;
   scriptPath?: string;
+  timerCadence?: string;
 }
 
 export interface PersonalSetupResult {
@@ -68,6 +69,7 @@ async function writeTrackedFile(targetPath: string, content: string, created: st
 
 function buildEnvFile(config: UrchinConfig): string {
   return [
+    envLine('URCHIN_AGENT_EVENTS_PATH', config.agentEventsPath),
     envLine('URCHIN_VAULT_ROOT', config.vaultRoot),
     envLine('URCHIN_ARCHIVE_ROOT', config.archiveRoot),
     envLine('URCHIN_STATE_PATH', config.statePath),
@@ -80,6 +82,9 @@ function buildEnvFile(config: UrchinConfig): string {
     envLine('URCHIN_PROJECT_ALIAS_PATH', config.projectAliasPath),
     envLine('URCHIN_SHELL_HISTORY_FILE', config.shellHistoryFile),
     envLine('URCHIN_REPOS_ROOTS', config.reposRoots.join(',')),
+    ...(config.gitAuthor ? [envLine('URCHIN_GIT_AUTHOR', config.gitAuthor)] : []),
+    envLine('URCHIN_TIMER_CADENCE', config.timerCadence),
+    envLine('URCHIN_VSCODE_WORKSPACE_ALIASES_PATH', config.vscodeWorkspaceAliasesPath),
     envLine('URCHIN_VSCODE_EVENTS_PATH', config.vscodeEventsPath),
   ].join('\n') + '\n';
 }
@@ -100,14 +105,14 @@ function buildServiceFile(paths: PersonalPaths, nodePath: string, scriptPath: st
   ].join('\n') + '\n';
 }
 
-function buildTimerFile(): string {
+function buildTimerFile(cadence: string): string {
   return [
     '[Unit]',
     'Description=Run Urchin personal sync on a steady cadence',
     '',
     '[Timer]',
     'OnBootSec=2m',
-    'OnUnitActiveSec=5m',
+    `OnUnitActiveSec=${cadence}`,
     'Persistent=true',
     'Unit=urchin.service',
     '',
@@ -125,7 +130,10 @@ function buildPersonalNote(config: UrchinConfig, state: PersonalAutomationState)
     '## Current setup',
     `- Vault: \`${config.vaultRoot}\``,
     `- Archive: \`${config.archiveRoot}\``,
+    `- Agent bridge queue: \`${config.agentEventsPath}\``,
     `- VS Code bridge queue: \`${config.vscodeEventsPath}\``,
+    `- VS Code workspace aliases: \`${config.vscodeWorkspaceAliasesPath}\``,
+    `- Timer cadence: \`${config.timerCadence}\``,
     `- Automation installed: \`${state.systemdAvailable}\``,
     `- Timer enabled: \`${state.timerEnabled === null ? 'unknown' : state.timerEnabled}\``,
     `- Timer active: \`${state.timerActive === null ? 'unknown' : state.timerActive}\``,
@@ -133,8 +141,18 @@ function buildPersonalNote(config: UrchinConfig, state: PersonalAutomationState)
     '## Daily use',
     '1. Run `urchin doctor` when you want blunt runtime truth.',
     '2. Let the timer keep sync moving in the background.',
-    '3. Use `urchin ingest-vscode ...` or an editor bridge to send workspace-aware editor events.',
+    '3. Use `urchin ingest-vscode ...` or `urchin ingest-agent ...` to send workspace-aware editor or agent events.',
     '4. Check promoted context in project notes and `30-resources/ai/urchin.md`.',
+    '',
+    '## One-off editor events',
+    '```bash',
+    'urchin ingest-vscode --workspace urchin "Shipped a useful change"',
+    '```',
+    '',
+    '## One-off agent events',
+    '```bash',
+    'urchin ingest-agent --agent codex --workspace urchin --status completed "Finished a useful task"',
+    '```',
     '',
     '## Key paths',
     `- Copilot session-state: \`${config.copilotSessionRoot}\``,
@@ -202,7 +220,7 @@ export async function setupPersonalWorkflow(options: PersonalSetupOptions): Prom
 
   await writeTrackedFile(paths.envPath, buildEnvFile(options.config), created, updated, written);
   await writeTrackedFile(paths.servicePath, buildServiceFile(paths, nodePath, scriptPath), created, updated, written);
-  await writeTrackedFile(paths.timerPath, buildTimerFile(), created, updated, written);
+  await writeTrackedFile(paths.timerPath, buildTimerFile(options.timerCadence ?? options.config.timerCadence), created, updated, written);
 
   let state = await getPersonalAutomationState(options.homeRoot);
   if (options.enableSystemd && state.systemdAvailable) {

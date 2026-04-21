@@ -143,6 +143,14 @@ export async function initializeVault(options: InitOptions): Promise<InitResult>
     created.push(config.projectAliasPath);
   }
 
+  await fs.ensureDir(path.dirname(config.vscodeWorkspaceAliasesPath));
+  if (await fs.pathExists(config.vscodeWorkspaceAliasesPath)) {
+    reused.push(config.vscodeWorkspaceAliasesPath);
+  } else {
+    await writeFileAtomic(config.vscodeWorkspaceAliasesPath, '{}\n');
+    created.push(config.vscodeWorkspaceAliasesPath);
+  }
+
   return {
     created: created.sort(),
     mode: options.mode,

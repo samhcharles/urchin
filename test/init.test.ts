@@ -11,6 +11,7 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'urchin-init-'));
   const vaultRoot = path.join(root, 'vault');
   const config: UrchinConfig = {
+    agentEventsPath: path.join(root, '.local', 'share', 'urchin', 'agents', 'events.jsonl'),
     archiveIndexPath: path.join(vaultRoot, '40-archive', 'urchin', 'index.md'),
     archiveRoot: path.join(vaultRoot, '40-archive', 'urchin'),
     claudeHistoryFile: path.join(root, '.claude', 'history.jsonl'),
@@ -21,9 +22,13 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
     openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     reposRoots: [path.join(root, 'dev')],
+    shellIgnorePrefixes: ['cd', 'ls'],
+    shellMinCommandLength: 8,
     shellHistoryFile: path.join(root, '.bash_history'),
     statePath: path.join(root, '.state', 'urchin.json'),
+    timerCadence: '5m',
     vaultRoot,
+    vscodeWorkspaceAliasesPath: path.join(root, '.config', 'urchin', 'vscode-workspaces.json'),
     vscodeEventsPath: path.join(root, '.local', 'share', 'urchin', 'editors', 'vscode', 'events.jsonl'),
   };
 
@@ -42,6 +47,7 @@ test('initializeVault scaffolds a starter vault without overwriting key notes', 
     assert.equal(await fs.pathExists(path.join(config.vaultRoot, 'HOME.md')), true);
     assert.equal(await fs.pathExists(path.join(config.vaultRoot, '30-resources', 'ai', 'urchin.md')), true);
     assert.equal(await fs.pathExists(config.projectAliasPath), true);
+    assert.equal(await fs.pathExists(config.vscodeWorkspaceAliasesPath), true);
     assert.equal(result.created.includes('HOME.md'), true);
   });
 });
@@ -58,5 +64,6 @@ test('initializeVault wires an existing vault and preserves existing files', asy
     assert.equal(await fs.pathExists(config.inboxCapturePath), true);
     assert.equal(await fs.pathExists(path.join(config.vaultRoot, '40-archive', 'urchin')), true);
     assert.equal(result.reused.includes(config.projectAliasPath), false);
+    assert.equal(result.reused.includes(config.vscodeWorkspaceAliasesPath), false);
   });
 });

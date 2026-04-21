@@ -12,6 +12,7 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'urchin-doctor-'));
   const vaultRoot = path.join(root, 'vault');
   const config: UrchinConfig = {
+    agentEventsPath: path.join(root, '.local', 'share', 'urchin', 'agents', 'events.jsonl'),
     archiveIndexPath: path.join(vaultRoot, '40-archive', 'urchin', 'index.md'),
     archiveRoot: path.join(vaultRoot, '40-archive', 'urchin'),
     claudeHistoryFile: path.join(root, '.claude', 'history.jsonl'),
@@ -22,9 +23,13 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
     openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     reposRoots: [path.join(root, 'dev'), path.join(root, 'repos')],
+    shellIgnorePrefixes: ['cd', 'ls'],
+    shellMinCommandLength: 8,
     shellHistoryFile: path.join(root, '.bash_history'),
     statePath: path.join(root, '.state', 'urchin.json'),
+    timerCadence: '5m',
     vaultRoot,
+    vscodeWorkspaceAliasesPath: path.join(root, '.config', 'urchin', 'vscode-workspaces.json'),
     vscodeEventsPath: path.join(root, '.local', 'share', 'urchin', 'editors', 'vscode', 'events.jsonl'),
   };
 
@@ -36,22 +41,28 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
   await fs.ensureDir(path.dirname(config.claudeHistoryFile));
   await fs.writeFile(config.claudeHistoryFile, '', 'utf8');
   await fs.writeFile(config.shellHistoryFile, 'echo hello\n', 'utf8');
-  await saveState(config.statePath, {
-    lastSuccessfulSyncAt: '2026-04-21T08:00:00.000Z',
-    lastSyncStartedAt: '2026-04-21T09:00:00.000Z',
-    sources: {
-      copilot: {
-        eventCount: 4,
-        lastRunAt: '2026-04-21T09:00:00.000Z',
-        lastSuccessAt: '2026-04-21T09:00:00.000Z',
+    await saveState(config.statePath, {
+      lastPromotionNotReason: 'no project-tagged or decision events met promotion rules',
+      lastSyncCollectedCount: 8,
+      lastSyncDedupedCount: 6,
+      lastSyncPromotedCount: 2,
+      lastSuccessfulSyncAt: '2026-04-21T08:00:00.000Z',
+      lastSyncStartedAt: '2026-04-21T09:00:00.000Z',
+      lastSyncWrittenCount: 6,
+      sources: {
+        copilot: {
+          collectedCount: 4,
+          eventCount: 4,
+          lastRunAt: '2026-04-21T09:00:00.000Z',
+          lastSuccessAt: '2026-04-21T09:00:00.000Z',
+        },
+        gemini: {
+          eventCount: 0,
+          lastError: 'gemini root missing',
+          lastRunAt: '2026-04-21T09:00:00.000Z',
+        },
       },
-      gemini: {
-        eventCount: 0,
-        lastError: 'gemini root missing',
-        lastRunAt: '2026-04-21T09:00:00.000Z',
-      },
-    },
-  });
+    });
 
   try {
     await run(config, root);
@@ -78,8 +89,13 @@ test('buildDoctorReport distinguishes reachable shipped collectors from planned 
 
     assert.equal(report.generatedAt, '2026-04-21T10:00:00.000Z');
     assert.equal(report.vault.writable, true);
+    assert.equal(report.sync.lastPromotionNotReason, 'no project-tagged or decision events met promotion rules');
+    assert.equal(report.sync.lastSyncCollectedCount, 8);
+    assert.equal(report.sync.lastSyncDedupedCount, 6);
+    assert.equal(report.sync.lastSyncPromotedCount, 2);
     assert.equal(report.sync.lastSuccessfulSyncAt, '2026-04-21T08:00:00.000Z');
     assert.equal(report.sync.connectedSourceCount >= 1, true);
+    assert.equal(report.sync.lastSyncWrittenCount, 6);
     assert.equal(report.automation.envExists, true);
     assert.equal(report.automation.serviceInstalled, true);
     assert.equal(report.automation.timerInstalled, true);
@@ -88,6 +104,7 @@ test('buildDoctorReport distinguishes reachable shipped collectors from planned 
     const copilot = report.sources.find((source) => source.source === 'copilot');
     assert.ok(copilot);
     assert.equal(copilot.status, 'ready');
+    assert.equal(copilot.runtime?.collectedCount, 4);
     assert.equal(copilot.runtime?.eventCount, 4);
 
     const claude = report.sources.find((source) => source.source === 'claude');
@@ -98,10 +115,14 @@ test('buildDoctorReport distinguishes reachable shipped collectors from planned 
     assert.ok(git);
     assert.equal(git.details?.discoveredRepos, 1);
 
-    assert.equal(report.sync.shippedSourceCount, 8);
+    assert.equal(report.sync.shippedSourceCount, 9);
 
     const vscodeSpike = report.spikes.find((spike) => spike.id === 'editor-vscode');
     assert.ok(vscodeSpike);
     assert.equal(vscodeSpike.status, 'shipped');
+
+    const agentSpike = report.spikes.find((spike) => spike.id === 'agent-bridge');
+    assert.ok(agentSpike);
+    assert.equal(agentSpike.status, 'shipped');
   });
 });

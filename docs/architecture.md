@@ -19,6 +19,7 @@ The core owns the rules that should stay stable as adapters grow:
 Spikes are adapters and outputs that plug into the core:
 
 - source collectors: Copilot, Claude, Gemini, Git, shell, OpenClaw, VS Code bridge
+- generic agent bridge collectors for Codex-style or custom runtimes that can emit append-only local events
 - editor adapters and extension bridges, starting with a shipped VS Code queue contract
 - bounded append-only intake for browser or network-fed events
 - archive writers for timelines, project activity, and triage
@@ -50,6 +51,15 @@ External producers should write append-only JSONL under the intake root:
 ```
 
 Urchin treats intake events like any other collector output: sanitize, dedupe, route, and then write with provenance preserved.
+
+Urchin now also ships a dedicated local agent bridge path outside the generic intake root:
+
+- `URCHIN_AGENT_EVENTS_PATH`
+- append-only JSONL
+- explicit `agent`, `sessionId`, and `content`
+- optional workspace/file/model/status metadata for better routing and replay
+
+That keeps custom-agent unification real without over-claiming native support for every runtime.
 
 ## Install modes
 

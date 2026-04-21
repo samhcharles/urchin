@@ -68,7 +68,21 @@ function isDecisionEvent(event: UrchinEvent): boolean {
   return event.tags.includes('decision') || event.metadata.decision === true;
 }
 
-async function writeProjectPromotions(config: UrchinConfig, linker: Linker, events: UrchinEvent[]): Promise<string[]> {
+export interface PromotionSummary {
+  decisions: number;
+  projectEvents: number;
+  projectNotes: number;
+  resourceNotes: number;
+}
+
+export interface PromotionResult {
+  promotedCount: number;
+  promotedPaths: string[];
+  summary: PromotionSummary;
+  whyNot?: string;
+}
+
+async function writeProjectPromotions(config: UrchinConfig, linker: Linker, events: UrchinEvent[]): Promise<{ paths: string[]; projectEventCount: number }> {
   const byProject = new Map<string, UrchinEvent[]>();
 
   for (const event of events) {
@@ -87,6 +101,7 @@ async function writeProjectPromotions(config: UrchinConfig, linker: Linker, even
   }
 
   const writtenPaths: string[] = [];
+  const projectEventCount = [...byProject.values()].reduce((count, projectEvents) => count + projectEvents.length, 0);
 
   for (const [project, projectEvents] of byProject.entries()) {
     const notePath = path.join(config.vaultRoot, '10-projects', `${project}.md`);
@@ -116,16 +131,16 @@ async function writeProjectPromotions(config: UrchinConfig, linker: Linker, even
     writtenPaths.push(notePath);
   }
 
-  return writtenPaths;
+  return { paths: writtenPaths, projectEventCount };
 }
 
-async function writeResourcePromotion(config: UrchinConfig, linker: Linker, events: UrchinEvent[]): Promise<string[]> {
+async function writeResourcePromotion(config: UrchinConfig, linker: Linker, events: UrchinEvent[]): Promise<{ paths: string[]; promotableCount: number }> {
   const promotable = events
     .filter((event) => isProjectPromotable(event, linker) || isDecisionEvent(event))
     .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
     .slice(0, 10);
   if (promotable.length === 0) {
-    return [];
+    return { paths: [], promotableCount: 0 };
   }
 
   const resourcePath = path.join(config.vaultRoot, '30-resources', 'ai', 'urchin.md');
@@ -143,16 +158,16 @@ async function writeResourcePromotion(config: UrchinConfig, linker: Linker, even
   );
 
   await writeFileAtomic(resourcePath, next);
-  return [resourcePath];
+  return { paths: [resourcePath], promotableCount: promotable.length };
 }
 
-async function writeDecisionPromotion(config: UrchinConfig, linker: Linker, events: UrchinEvent[]): Promise<string[]> {
+async function writeDecisionPromotion(config: UrchinConfig, linker: Linker, events: UrchinEvent[]): Promise<{ decisionCount: number; paths: string[] }> {
   const decisions = events
     .filter(isDecisionEvent)
     .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
     .slice(0, 10);
   if (decisions.length === 0) {
-    return [];
+    return { decisionCount: 0, paths: [] };
   }
 
   const decisionPath = path.join(config.vaultRoot, '30-resources', 'decisions.md');
@@ -171,15 +186,27 @@ async function writeDecisionPromotion(config: UrchinConfig, linker: Linker, even
   );
 
   await writeFileAtomic(decisionPath, next);
-  return [decisionPath];
+  return { decisionCount: decisions.length, paths: [decisionPath] };
 }
 
-export async function promoteEvents(config: UrchinConfig, linker: Linker, events: UrchinEvent[]): Promise<string[]> {
-  const [projectPaths, resourcePaths, decisionPaths] = await Promise.all([
+export async function promoteEvents(config: UrchinConfig, linker: Linker, events: UrchinEvent[]): Promise<PromotionResult> {
+  const [projectResult, resourceResult, decisionResult] = await Promise.all([
     writeProjectPromotions(config, linker, events),
     writeResourcePromotion(config, linker, events),
     writeDecisionPromotion(config, linker, events),
   ]);
 
-  return [...projectPaths, ...resourcePaths, ...decisionPaths];
+  const promotedPaths = [...projectResult.paths, ...resourceResult.paths, ...decisionResult.paths];
+
+  return {
+    promotedCount: promotedPaths.length,
+    promotedPaths,
+    summary: {
+      decisions: decisionResult.decisionCount,
+      projectEvents: projectResult.projectEventCount,
+      projectNotes: projectResult.paths.length,
+      resourceNotes: resourceResult.paths.length,
+    },
+    ...(promotedPaths.length === 0 ? { whyNot: 'no project-tagged or decision events met promotion rules' } : {}),
+  };
 }

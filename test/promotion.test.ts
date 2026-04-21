@@ -13,6 +13,7 @@ async function withTempVault(run: (config: UrchinConfig, linker: Linker) => Prom
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'urchin-promote-'));
   const vaultRoot = path.join(root, 'vault');
   const config: UrchinConfig = {
+    agentEventsPath: path.join(root, '.local', 'share', 'urchin', 'agents', 'events.jsonl'),
     archiveIndexPath: path.join(vaultRoot, '40-archive', 'urchin', 'index.md'),
     archiveRoot: path.join(vaultRoot, '40-archive', 'urchin'),
     claudeHistoryFile: path.join(root, '.claude', 'history.jsonl'),
@@ -23,9 +24,13 @@ async function withTempVault(run: (config: UrchinConfig, linker: Linker) => Prom
     openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     reposRoots: [path.join(root, 'dev')],
+    shellIgnorePrefixes: ['cd', 'ls'],
+    shellMinCommandLength: 8,
     shellHistoryFile: path.join(root, '.bash_history'),
     statePath: path.join(root, '.state', 'urchin.json'),
+    timerCadence: '5m',
     vaultRoot,
+    vscodeWorkspaceAliasesPath: path.join(root, '.config', 'urchin', 'vscode-workspaces.json'),
     vscodeEventsPath: path.join(root, '.local', 'share', 'urchin', 'editors', 'vscode', 'events.jsonl'),
   };
 
@@ -76,7 +81,7 @@ test('promoteEvents updates project, resource, and decision surfaces with manage
       }),
     ]);
 
-    assert.equal(written.length, 3);
+    assert.equal(written.promotedPaths.length, 3);
 
     const [project, resource, decisions] = await Promise.all([
       fs.readFile(path.join(config.vaultRoot, '10-projects', 'openclaw.md'), 'utf8'),

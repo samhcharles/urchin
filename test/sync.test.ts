@@ -34,6 +34,7 @@ async function withTempSyncHarness(
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'urchin-sync-'));
   const vaultRoot = path.join(root, 'vault');
   const config: UrchinConfig = {
+    agentEventsPath: path.join(root, '.local', 'share', 'urchin', 'agents', 'events.jsonl'),
     archiveIndexPath: path.join(vaultRoot, '40-archive', 'urchin', 'index.md'),
     archiveRoot: path.join(vaultRoot, '40-archive', 'urchin'),
     claudeHistoryFile: path.join(root, '.claude', 'history.jsonl'),
@@ -44,9 +45,13 @@ async function withTempSyncHarness(
     openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     reposRoots: [path.join(root, 'dev')],
+    shellIgnorePrefixes: ['cd', 'ls'],
+    shellMinCommandLength: 8,
     shellHistoryFile: path.join(root, '.bash_history'),
     statePath: path.join(root, '.state', 'urchin.json'),
+    timerCadence: '5m',
     vaultRoot,
+    vscodeWorkspaceAliasesPath: path.join(root, '.config', 'urchin', 'vscode-workspaces.json'),
     vscodeEventsPath: path.join(root, '.local', 'share', 'urchin', 'editors', 'vscode', 'events.jsonl'),
   };
 
@@ -94,6 +99,9 @@ test('runSync checkpoints from sync start when the run succeeds', async () => {
     const state = await fs.readJson(config.statePath);
 
     assert.equal(result.failedCollectors.length, 0);
+    assert.equal(result.collectedCount, 1);
+    assert.equal(result.dedupedCount, 1);
+    assert.equal(result.writtenCount, 1);
     assert.equal(state.lastSuccessfulSyncAt, '2026-04-21T09:00:00.000Z');
   });
 });
@@ -115,10 +123,17 @@ test('runSync does not advance state when any collector fails', async () => {
     const state = await fs.readJson(config.statePath);
 
     assert.equal(result.failedCollectors.length, 1);
+    assert.equal(result.collectedCount, 1);
+    assert.equal(result.sourceBreakdown.length, 2);
     assert.equal(result.promotedPaths.length > 0, true);
+    assert.equal(result.writtenCount > 0, true);
     assert.equal(result.writtenPaths.length > 0, true);
+    assert.equal(state.lastSyncCollectedCount, 1);
+    assert.equal(state.lastSyncDedupedCount, 1);
+    assert.equal(state.lastSyncWrittenCount, 1);
     assert.equal(state.lastSuccessfulSyncAt, '2026-04-21T07:00:00.000Z');
     assert.equal(state.lastSyncStartedAt, '2026-04-21T09:00:00.000Z');
+    assert.equal(state.lastSyncPromotedCount > 0, true);
     assert.equal(state.sources.git.lastSuccessAt, '2026-04-21T09:00:00.000Z');
     assert.equal(state.sources.claude.lastError, 'collector claude failed');
   });
