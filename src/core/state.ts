@@ -1,5 +1,6 @@
 import * as fs from 'fs-extra';
-import * as path from 'node:path';
+
+import { writeJsonAtomic } from './io';
 
 export interface UrchinState {
   lastSuccessfulSyncAt?: string;
@@ -18,6 +19,5 @@ export async function loadState(statePath: string): Promise<UrchinState> {
 }
 
 export async function saveState(statePath: string, state: UrchinState): Promise<void> {
-  await fs.ensureDir(path.dirname(statePath));
-  await fs.writeJson(statePath, state, { spaces: 2 });
+  await writeJsonAtomic(statePath, state);
 }

@@ -28,6 +28,7 @@ export class IntakeCollector implements Collector {
       return [];
     }
 
+    const intakeRootReal = await fs.realpath(this.config.intakeRoot);
     const files = await glob('**/*.jsonl', {
       cwd: this.config.intakeRoot,
       absolute: true,
@@ -36,7 +37,13 @@ export class IntakeCollector implements Collector {
     const events: UrchinEvent[] = [];
 
     for (const filePath of files) {
-      const raw = await fs.readFile(filePath, 'utf8');
+      const realFilePath = await fs.realpath(filePath).catch(() => filePath);
+      const relative = path.relative(intakeRootReal, realFilePath);
+      if (relative.startsWith('..') || path.isAbsolute(relative)) {
+        continue;
+      }
+
+      const raw = await fs.readFile(realFilePath, 'utf8');
       for (const line of raw.split('\n').filter(Boolean)) {
         try {
           const entry = JSON.parse(line);
@@ -62,7 +69,7 @@ export class IntakeCollector implements Collector {
             metadata: typeof entry.metadata === 'object' && entry.metadata ? entry.metadata : {},
             provenance: {
               adapter: 'append-only-intake',
-              location: filePath,
+              location: realFilePath,
               scope: entry.scope === 'network' ? 'network' : 'local',
               sessionId: typeof entry.sessionId === 'string' ? entry.sessionId : undefined,
             },

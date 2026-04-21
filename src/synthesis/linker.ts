@@ -13,10 +13,12 @@ export class Linker {
       ignore: ['scripts/**', '.obsidian/**', 'node_modules/**']
     });
 
-    this.entities = files.map(f => {
-      const name = path.basename(f, '.md');
-      return name;
-    }).filter(name => name.length > 3); // Avoid linking very short common words
+    this.entities = [...new Set(
+      files.map(f => {
+        const name = path.basename(f, '.md');
+        return name;
+      }).filter(name => name.length > 3 && name.length <= 120)
+    )];
     
     // Sort entities by length descending to match longest phrases first
     this.entities.sort((a, b) => b.length - a.length);

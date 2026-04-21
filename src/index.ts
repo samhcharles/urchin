@@ -11,12 +11,11 @@ import { IntakeCollector } from './collectors/intake';
 import { OpenClawCollector } from './collectors/openclaw';
 import { GitCollector, ShellCollector } from './collectors/shell';
 import { loadConfig } from './core/config';
-import { dedupeEvents } from './core/dedupe';
-import { sanitize } from './core/redaction';
-import { loadState, saveState } from './core/state';
-import { appendManualCapture, writeArchive, writeArchiveIndex } from './obsidian/writer';
+import { runSync } from './core/sync';
+import { loadState } from './core/state';
+import { appendManualCapture } from './obsidian/writer';
 import { Linker } from './synthesis/linker';
-import { EventKind, EventSource, UrchinEvent } from './types';
+import { Collector, EventKind, EventSource } from './types';
 
 function parseFlags(args: string[]): { flags: Record<string, string>; rest: string[] } {
   const flags: Record<string, string> = {};
@@ -79,14 +78,7 @@ async function dumpThought(config: ReturnType<typeof loadConfig>, text: string) 
 }
 
 async function sync(config: ReturnType<typeof loadConfig>) {
-  const state = await loadState(config.statePath);
-  const sinceDate = state.lastSuccessfulSyncAt
-    ? new Date(state.lastSuccessfulSyncAt)
-    : new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-  console.log(`Urchin: syncing context since ${sinceDate.toISOString()}`);
-
-  const collectors = [
+  const collectors: Collector[] = [
     new IntakeCollector(config),
     new CopilotCollector(config),
     new GeminiCollector(config),
@@ -99,36 +91,27 @@ async function sync(config: ReturnType<typeof loadConfig>) {
   const linker = new Linker(config.vaultRoot);
   await linker.initialize();
 
-  let allEvents: UrchinEvent[] = [];
+  const result = await runSync(config, { collectors, linker });
+  console.log(`Urchin: syncing context since ${result.sinceDate}`);
 
-  for (const collector of collectors) {
-    try {
-      const events = await collector.collect(sinceDate);
-      allEvents.push(...events);
-    } catch (error) {
-      console.error(`Error in collector ${collector.name}:`, error);
+  if (result.failedCollectors.length > 0) {
+    for (const failure of result.failedCollectors) {
+      console.error(`Urchin: collector ${failure.collector} failed`, failure.error);
     }
+    console.error('Urchin: state was not advanced because one or more collectors failed.');
+    if (result.writtenPaths.length > 0) {
+      console.error(`Urchin: wrote ${result.writtenPaths.length} archive note(s) from successful collectors.`);
+    }
+    process.exitCode = 1;
+    return;
   }
 
-  allEvents.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  const uniqueEvents = dedupeEvents(allEvents);
-
-  if (uniqueEvents.length === 0) {
+  if (result.eventCount === 0) {
     console.log('Urchin: no new events to sync.');
     return;
   }
 
-  const sanitizedEvents = uniqueEvents.map((event) => ({
-    ...event,
-    summary: sanitize(event.summary, 240),
-    content: sanitize(event.content),
-  }));
-
-  const writtenPaths = await writeArchive(config, linker, sanitizedEvents);
-  await writeArchiveIndex(config);
-  await saveState(config.statePath, { lastSuccessfulSyncAt: new Date().toISOString() });
-
-  console.log(`Urchin: updated ${writtenPaths.length} archive note(s) under ${config.archiveRoot}`);
+  console.log(`Urchin: updated ${result.writtenPaths.length} archive note(s) under ${config.archiveRoot}`);
 }
 
 async function status(config: ReturnType<typeof loadConfig>) {
@@ -176,7 +159,10 @@ async function ingest(config: ReturnType<typeof loadConfig>, args: string[]) {
     summary: flags.summary ?? content.slice(0, 140),
     content,
     tags: flags.tags ? flags.tags.split(',').map((tag) => tag.trim()).filter(Boolean) : [],
-    metadata: flags.title ? { title: flags.title } : {},
+    metadata: {
+      ...(flags.location ? { location: flags.location } : {}),
+      ...(flags.title ? { title: flags.title } : {}),
+    },
     scope: flags.scope === 'network' ? 'network' : 'local',
     sessionId: flags.sessionId,
   };
@@ -186,4 +172,7 @@ async function ingest(config: ReturnType<typeof loadConfig>, args: string[]) {
   console.log(`Urchin: ingested ${source} event into ${targetFile}`);
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

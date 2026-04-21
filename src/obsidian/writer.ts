@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { glob } from 'glob';
 
 import { UrchinConfig } from '../core/config';
+import { writeFileAtomic } from '../core/io';
 import { sanitize } from '../core/redaction';
 import { Linker } from '../synthesis/linker';
 import { UrchinEvent } from '../types';
@@ -159,8 +160,7 @@ async function writeDailyTimelines(config: UrchinConfig, linker: Linker, events:
       .filter(Boolean)
       .join('\n\n') + '\n';
 
-    await fs.ensureDir(path.dirname(targetPath));
-    await fs.writeFile(targetPath, body, 'utf8');
+    await writeFileAtomic(targetPath, body);
     writtenPaths.push(targetPath);
   }
 
@@ -203,8 +203,7 @@ async function writeProjectTimelines(config: UrchinConfig, linker: Linker, event
       '## Events\n' + projectEvents.map((event) => renderEvent(linker, event)).join('\n\n---\n\n'),
     ].join('\n\n') + '\n';
 
-    await fs.ensureDir(path.dirname(targetPath));
-    await fs.writeFile(targetPath, body, 'utf8');
+    await writeFileAtomic(targetPath, body);
     writtenPaths.push(targetPath);
   }
 
@@ -241,8 +240,7 @@ async function writeTriageNotes(config: UrchinConfig, linker: Linker, events: Ur
       '## Candidates\n' + triageEvents.map((event) => renderEvent(linker, event)).join('\n\n---\n\n'),
     ].join('\n\n') + '\n';
 
-    await fs.ensureDir(path.dirname(targetPath));
-    await fs.writeFile(targetPath, body, 'utf8');
+    await writeFileAtomic(targetPath, body);
     writtenPaths.push(targetPath);
   }
 
@@ -311,6 +309,5 @@ export async function writeArchiveIndex(config: UrchinConfig): Promise<void> {
       : ['- None yet']),
   ].join('\n\n') + '\n';
 
-  await fs.ensureDir(path.dirname(config.archiveIndexPath));
-  await fs.writeFile(config.archiveIndexPath, content, 'utf8');
+  await writeFileAtomic(config.archiveIndexPath, content);
 }

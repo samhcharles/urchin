@@ -24,6 +24,34 @@ See [`docs/architecture.md`](docs/architecture.md) for the core-plus-spikes mode
 - `urchin ingest --source browser --kind capture --scope network "captured text"` — append an external/browser-style event into the bounded intake queue
 - `urchin status` — show resolved config and sync state
 
+If a collector fails during `urchin sync`, Urchin now refuses to advance the sync checkpoint. That keeps the next run from silently skipping activity.
+
+## Setup
+
+```bash
+npm install
+npm run build
+node dist/src/index.js status
+```
+
+Urchin defaults to the local paths used in this workflow, but every important path is configurable:
+
+| Variable | Default |
+| --- | --- |
+| `URCHIN_VAULT_ROOT` | `~/brain` |
+| `URCHIN_ARCHIVE_ROOT` | `~/brain/40-archive/urchin` |
+| `URCHIN_STATE_PATH` | `~/.local/state/urchin/state.json` |
+| `URCHIN_INBOX_CAPTURE_PATH` | `~/brain/00-inbox/urchin-capture.md` |
+| `URCHIN_INTAKE_ROOT` | `~/.local/share/urchin/intake` |
+| `URCHIN_COPILOT_SESSION_ROOT` | `~/.copilot/session-state` |
+| `URCHIN_CLAUDE_HISTORY_FILE` | `~/.claude/history.jsonl` |
+| `URCHIN_GEMINI_TMP_ROOT` | `~/.gemini/tmp` |
+| `URCHIN_OPENCLAW_COMMANDS_LOG` | `~/.openclaw/logs/commands.log` |
+| `URCHIN_SHELL_HISTORY_FILE` | `~/.bash_history` |
+| `URCHIN_REPOS_ROOTS` | `~/dev,~/repos` |
+
+For day-to-day use, start with `urchin status`, confirm the resolved paths, then run `urchin sync`.
+
 ## Development
 
 ```bash

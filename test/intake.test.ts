@@ -65,3 +65,31 @@ test('IntakeCollector parses local and network events from the append-only queue
     assert.equal(events[0]?.provenance.sessionId, 'browser-session');
   });
 });
+
+test('IntakeCollector ignores symlinked files that escape the intake root', async () => {
+  await withTempConfig(async (config) => {
+    const externalRoot = path.join(path.dirname(config.intakeRoot), 'external');
+    await fs.ensureDir(externalRoot);
+    await fs.ensureDir(config.intakeRoot);
+
+    const externalFile = path.join(externalRoot, 'outside.jsonl');
+    await fs.writeFile(
+      externalFile,
+      `${JSON.stringify({
+        id: 'outside-1',
+        source: 'browser',
+        kind: 'capture',
+        timestamp: '2026-04-21T08:10:00.000Z',
+        content: 'Should not be read through a symlink',
+      })}\n`,
+      'utf8',
+    );
+
+    await fs.symlink(externalFile, path.join(config.intakeRoot, 'outside.jsonl'));
+
+    const collector = new IntakeCollector(config);
+    const events = await collector.collect(new Date('2026-04-21T08:00:00.000Z'));
+
+    assert.equal(events.length, 0);
+  });
+});

@@ -1,6 +1,6 @@
 import * as fs from 'fs-extra';
 import * as path from 'node:path';
-import { execSync } from 'child_process';
+import { execFileSync } from 'node:child_process';
 import { UrchinConfig } from '../core/config';
 import { sanitize } from '../core/redaction';
 import { Collector, UrchinEvent } from '../types';
@@ -46,7 +46,12 @@ export class GitCollector implements Collector {
   async collect(since?: Date): Promise<UrchinEvent[]> {
     let events: UrchinEvent[] = [];
 
-    const dateStr = since ? since.toISOString() : '24 hours ago';
+    const gitArgs = [
+      'log',
+      '--author=samhcharles',
+      `--since=${since ? since.toISOString() : '24 hours ago'}`,
+      '--pretty=format:%h|%aI|%s',
+    ];
 
     for (const reposDir of this.config.reposRoots) {
       if (!(await fs.pathExists(reposDir))) {
@@ -59,7 +64,7 @@ export class GitCollector implements Collector {
         const gitDir = path.join(repoPath, '.git');
         if (await fs.pathExists(gitDir)) {
           try {
-            const log = execSync(`git log --author="samhcharles" --since="${dateStr}" --pretty=format:"%h|%aI|%s"`, {
+            const log = execFileSync('git', gitArgs, {
               cwd: repoPath,
               encoding: 'utf-8',
               stdio: ['ignore', 'pipe', 'ignore'],

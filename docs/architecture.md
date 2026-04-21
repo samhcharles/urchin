@@ -49,3 +49,4 @@ Urchin treats intake events like any other collector output: sanitize, dedupe, r
 - deterministic outputs over append-only magic
 - explicit routing instead of silent rewriting
 - tests around collectors and writers before expanding enrichment
+- never advance sync state after a partial collector failure
