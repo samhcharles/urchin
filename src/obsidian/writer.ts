@@ -57,10 +57,10 @@ function sourceSummary(events: UrchinEvent[]): string {
     .join('\n');
 }
 
-function projectSummary(events: UrchinEvent[]): string {
+function projectSummary(events: UrchinEvent[], linker: Linker): string {
   const counts = new Map<string, number>();
   for (const event of events) {
-    const project = deriveProject(event);
+    const project = deriveProjectLabel(event, linker);
     if (!project) {
       continue;
     }
@@ -102,9 +102,13 @@ function deriveProject(event: UrchinEvent): string | undefined {
   return undefined;
 }
 
-function isTriageCandidate(event: UrchinEvent): boolean {
+function deriveProjectLabel(event: UrchinEvent, linker: Linker): string | undefined {
   const project = deriveProject(event);
-  return (event.kind === 'capture' || event.source === 'browser' || event.source === 'manual') && !project;
+  if (!project) {
+    return undefined;
+  }
+
+  return linker.resolveProjectName(project) ?? project;
 }
 
 function renderEvent(linker: Linker, event: UrchinEvent): string {
@@ -115,7 +119,7 @@ function renderEvent(linker: Linker, event: UrchinEvent): string {
     `- **Provenance:** \`${sanitize(event.provenance.location, 220)}\``,
   ];
 
-  const project = deriveProject(event);
+  const project = deriveProjectLabel(event, linker);
   if (project) {
     lines.push(`- **Project:** [[${project}]]`);
   }
@@ -146,7 +150,7 @@ async function writeDailyTimelines(config: UrchinConfig, linker: Linker, events:
   for (const [day, dayEvents] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     dayEvents.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
     const targetPath = archivePath(config, day);
-    const projectLines = projectSummary(dayEvents);
+    const projectLines = projectSummary(dayEvents, linker);
     const body = [
       buildFrontmatter([
         ['tags', '[archive, urchin, timeline]'],
@@ -171,7 +175,7 @@ async function writeProjectTimelines(config: UrchinConfig, linker: Linker, event
   const grouped = new Map<string, UrchinEvent[]>();
 
   for (const event of events) {
-    const project = deriveProject(event);
+    const project = deriveProjectLabel(event, linker);
     if (!project) {
       continue;
     }
@@ -214,7 +218,8 @@ async function writeTriageNotes(config: UrchinConfig, linker: Linker, events: Ur
   const grouped = new Map<string, UrchinEvent[]>();
 
   for (const event of events) {
-    if (!isTriageCandidate(event)) {
+    const project = deriveProjectLabel(event, linker);
+    if ((event.kind !== 'capture' && event.source !== 'browser' && event.source !== 'manual') || project) {
       continue;
     }
 

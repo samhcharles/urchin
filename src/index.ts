@@ -71,7 +71,7 @@ async function main() {
 }
 
 async function dumpThought(config: ReturnType<typeof loadConfig>, text: string) {
-  const linker = new Linker(config.vaultRoot);
+  const linker = new Linker(config.vaultRoot, config.projectAliasPath);
   await linker.initialize();
   await appendManualCapture(config, linker, text);
   console.log(`Urchin: capture written to ${config.inboxCapturePath}`);
@@ -88,7 +88,7 @@ async function sync(config: ReturnType<typeof loadConfig>) {
     new GitCollector(config),
   ];
 
-  const linker = new Linker(config.vaultRoot);
+  const linker = new Linker(config.vaultRoot, config.projectAliasPath);
   await linker.initialize();
 
   const result = await runSync(config, { collectors, linker });
@@ -127,6 +127,7 @@ async function status(config: ReturnType<typeof loadConfig>) {
         intakeRoot: config.intakeRoot,
         lastSuccessfulSyncAt: state.lastSuccessfulSyncAt ?? null,
         openclawCommandsLog: config.openclawCommandsLog,
+        projectAliasPath: config.projectAliasPath,
         reposRoots: config.reposRoots,
         shellHistoryFile: config.shellHistoryFile,
         statePath: config.statePath,

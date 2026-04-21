@@ -22,6 +22,7 @@ async function withTempRepo(run: (config: UrchinConfig, repoPath: string) => Pro
     inboxCapturePath: path.join(root, 'vault', '00-inbox', 'urchin-capture.md'),
     intakeRoot: path.join(root, 'intake'),
     openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
+    projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     reposRoots: [reposRoot],
     shellHistoryFile: path.join(root, '.bash_history'),
     statePath: path.join(root, '.state', 'urchin.json'),

@@ -21,6 +21,7 @@ async function withTempVault(run: (config: UrchinConfig, linker: Linker) => Prom
     inboxCapturePath: path.join(vaultRoot, '00-inbox', 'urchin-capture.md'),
     intakeRoot: path.join(root, 'intake'),
     openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
+    projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     reposRoots: [path.join(root, 'dev')],
     shellHistoryFile: path.join(root, '.bash_history'),
     statePath: path.join(root, '.state', 'urchin.json'),
@@ -30,8 +31,9 @@ async function withTempVault(run: (config: UrchinConfig, linker: Linker) => Prom
   await fs.ensureDir(vaultRoot);
   await fs.ensureDir(path.join(vaultRoot, '10-projects'));
   await fs.writeFile(path.join(vaultRoot, '10-projects', 'urchin.md'), '# Urchin\n', 'utf8');
+  await fs.writeFile(path.join(vaultRoot, '10-projects', 'openclaw.md'), '# OpenClaw\n', 'utf8');
 
-  const linker = new Linker(vaultRoot);
+  const linker = new Linker(vaultRoot, config.projectAliasPath);
   await linker.initialize();
 
   try {
@@ -102,5 +104,26 @@ test('writeArchive emits daily, project, triage, and index notes', async () => {
     assert.match(index, /## Daily Timelines/);
     assert.match(index, /## Project Activity/);
     assert.match(index, /## Triage/);
+  });
+});
+
+test('writeArchive groups repo activity under the resolved project note name', async () => {
+  await withTempVault(async (config, linker) => {
+    await writeArchive(config, linker, [
+      event({
+        provenance: {
+          adapter: 'git-log',
+          location: '/tmp/repo',
+          scope: 'local',
+          repo: 'openclaw-workspace-braindump',
+        },
+      }),
+    ]);
+
+    const projectPath = path.join(config.archiveRoot, 'projects', 'openclaw', '2026', '04', '2026-04-21.md');
+    const project = await fs.readFile(projectPath, 'utf8');
+
+    assert.match(project, /Urchin Project Activity — openclaw — 2026-04-21/);
+    assert.match(project, /\*\*Project:\*\* \[\[openclaw\]\]/);
   });
 });

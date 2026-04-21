@@ -47,10 +47,13 @@ Urchin defaults to the local paths used in this workflow, but every important pa
 | `URCHIN_CLAUDE_HISTORY_FILE` | `~/.claude/history.jsonl` |
 | `URCHIN_GEMINI_TMP_ROOT` | `~/.gemini/tmp` |
 | `URCHIN_OPENCLAW_COMMANDS_LOG` | `~/.openclaw/logs/commands.log` |
+| `URCHIN_PROJECT_ALIAS_PATH` | `~/.config/urchin/project-aliases.json` |
 | `URCHIN_SHELL_HISTORY_FILE` | `~/.bash_history` |
 | `URCHIN_REPOS_ROOTS` | `~/dev,~/repos` |
 
 For day-to-day use, start with `urchin status`, confirm the resolved paths, then run `urchin sync`.
+
+`URCHIN_PROJECT_ALIAS_PATH` lets you pin repo or workspace names to real project notes when the names do not line up exactly.
 
 ## Development
 

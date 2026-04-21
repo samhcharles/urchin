@@ -42,6 +42,7 @@ async function withTempSyncHarness(
     inboxCapturePath: path.join(vaultRoot, '00-inbox', 'urchin-capture.md'),
     intakeRoot: path.join(root, 'intake'),
     openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
+    projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     reposRoots: [path.join(root, 'dev')],
     shellHistoryFile: path.join(root, '.bash_history'),
     statePath: path.join(root, '.state', 'urchin.json'),
@@ -51,7 +52,7 @@ async function withTempSyncHarness(
   await fs.ensureDir(path.join(vaultRoot, '10-projects'));
   await fs.writeFile(path.join(vaultRoot, '10-projects', 'urchin.md'), '# Urchin\n', 'utf8');
 
-  const linker = new Linker(vaultRoot);
+  const linker = new Linker(vaultRoot, config.projectAliasPath);
   await linker.initialize();
 
   try {
