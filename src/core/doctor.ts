@@ -79,6 +79,14 @@ const SOURCE_SPECS: SourceSpec[] = [
     status: ([root]) => (root?.exists ? 'ready' : 'missing'),
   },
   {
+    source: 'vscode',
+    label: 'VS Code bridge collector',
+    category: 'collector',
+    note: 'Reads explicit VS Code bridge events from the local queue file for editor session capture.',
+    paths: (config) => [config.vscodeEventsPath],
+    status: ([file]) => (file?.exists ? 'ready' : 'missing'),
+  },
+  {
     source: 'claude',
     label: 'Claude history + project collector',
     category: 'collector',
@@ -162,8 +170,8 @@ const SOURCE_SPECS: SourceSpec[] = [
 const SPIKE_REPORTS: DoctorSpikeReport[] = [
   {
     id: 'editor-vscode',
-    status: 'planned',
-    note: 'VS Code / VSCodium editor bridge is documented but not yet shipped as a real adapter.',
+    status: 'shipped',
+    note: 'VS Code / VSCodium now has a shipped local bridge contract through the dedicated queue file and collector.',
   },
   {
     id: 'editor-jetbrains',

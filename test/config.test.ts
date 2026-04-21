@@ -10,6 +10,7 @@ test('loadConfig defaults to the brain vault and archive paths', () => {
   const config = loadConfig();
   assert.match(config.vaultRoot, /brain$/);
   assert.match(config.archiveRoot, /40-archive[\/\\]urchin$/);
+  assert.match(config.vscodeEventsPath, /urchin[\/\\]editors[\/\\]vscode[\/\\]events\.jsonl$/);
 
   if (originalVaultRoot) {
     process.env.URCHIN_VAULT_ROOT = originalVaultRoot;

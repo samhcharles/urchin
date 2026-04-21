@@ -18,8 +18,8 @@ The core owns the rules that should stay stable as adapters grow:
 
 Spikes are adapters and outputs that plug into the core:
 
-- source collectors: Copilot, Claude, Gemini, Git, shell, OpenClaw
-- editor adapters and extension bridges
+- source collectors: Copilot, Claude, Gemini, Git, shell, OpenClaw, VS Code bridge
+- editor adapters and extension bridges, starting with a shipped VS Code queue contract
 - bounded append-only intake for browser or network-fed events
 - archive writers for timelines, project activity, and triage
 

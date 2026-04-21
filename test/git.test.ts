@@ -27,6 +27,7 @@ async function withTempRepo(run: (config: UrchinConfig, repoPath: string) => Pro
     shellHistoryFile: path.join(root, '.bash_history'),
     statePath: path.join(root, '.state', 'urchin.json'),
     vaultRoot: path.join(root, 'vault'),
+    vscodeEventsPath: path.join(root, '.local', 'share', 'urchin', 'editors', 'vscode', 'events.jsonl'),
   };
 
   await fs.ensureDir(repoPath);

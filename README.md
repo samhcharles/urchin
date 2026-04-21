@@ -25,6 +25,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the core-plus-spikes mode
 - `urchin` or `urchin sync` — collect recent activity and write timeline notes
 - `urchin dump "text"` — append a manual capture into the Obsidian inbox
 - `urchin ingest --source browser --kind capture --scope network "captured text"` — append an external/browser-style event into the bounded intake queue
+- `urchin ingest-vscode --workspace /repo --session chat-1 --file /repo/src/app.ts --role assistant "message"` — append a VS Code bridge event into the dedicated editor queue
 - `urchin status` — show resolved config and sync state
 - `urchin doctor` — show blunt runtime diagnostics: what is shipped, what is reachable, what last ran, and what is still only planned
 
@@ -55,6 +56,7 @@ Urchin defaults to the local paths used in this workflow, but every important pa
 | `URCHIN_PROJECT_ALIAS_PATH` | `~/.config/urchin/project-aliases.json` |
 | `URCHIN_SHELL_HISTORY_FILE` | `~/.bash_history` |
 | `URCHIN_REPOS_ROOTS` | `~/dev,~/repos` |
+| `URCHIN_VSCODE_EVENTS_PATH` | `~/.local/share/urchin/editors/vscode/events.jsonl` |
 
 For day-to-day use, start with `urchin doctor`, confirm the reachable sources and runtime state, then run `urchin sync`.
 

@@ -24,6 +24,7 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
     shellHistoryFile: path.join(root, '.bash_history'),
     statePath: path.join(root, '.state', 'urchin.json'),
     vaultRoot,
+    vscodeEventsPath: path.join(root, '.local', 'share', 'urchin', 'editors', 'vscode', 'events.jsonl'),
   };
 
   try {

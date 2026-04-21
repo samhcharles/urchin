@@ -99,6 +99,14 @@ function deriveProject(event: UrchinEvent): string | undefined {
     }
   }
 
+  const workspacePath = typeof event.metadata.workspacePath === 'string' ? event.metadata.workspacePath : undefined;
+  if (workspacePath?.trim()) {
+    const derived = path.basename(workspacePath);
+    if (derived && derived !== '.' && derived !== path.sep) {
+      return sanitize(derived, 120);
+    }
+  }
+
   return undefined;
 }
 
@@ -130,6 +138,21 @@ function renderEvent(linker: Linker, event: UrchinEvent): string {
 
   if (event.provenance.sessionId) {
     lines.push(`- **Session:** \`${sanitize(event.provenance.sessionId, 120)}\``);
+  }
+
+  const editor = typeof event.metadata.editor === 'string' ? event.metadata.editor : undefined;
+  if (editor) {
+    lines.push(`- **Editor:** \`${sanitize(editor, 120)}\``);
+  }
+
+  const workspacePath = typeof event.metadata.workspacePath === 'string' ? event.metadata.workspacePath : undefined;
+  if (workspacePath) {
+    lines.push(`- **Workspace:** \`${sanitize(workspacePath, 220)}\``);
+  }
+
+  const filePath = typeof event.metadata.filePath === 'string' ? event.metadata.filePath : undefined;
+  if (filePath) {
+    lines.push(`- **File:** \`${sanitize(filePath, 220)}\``);
   }
 
   return lines.join('\n');

@@ -11,6 +11,7 @@ import { GeminiCollector } from './collectors/gemini';
 import { IntakeCollector } from './collectors/intake';
 import { OpenClawCollector } from './collectors/openclaw';
 import { GitCollector, ShellCollector } from './collectors/shell';
+import { VSCodeCollector } from './collectors/vscode';
 import { loadConfig } from './core/config';
 import { buildDoctorReport } from './core/doctor';
 import { runSync } from './core/sync';
@@ -61,6 +62,11 @@ async function main() {
 
   if (command === 'ingest') {
     await ingest(config, args.slice(1));
+    return;
+  }
+
+  if (command === 'ingest-vscode') {
+    await ingestVSCode(config, args.slice(1));
     return;
   }
 
@@ -116,6 +122,7 @@ async function sync(config: ReturnType<typeof loadConfig>) {
     new OpenClawCollector(config),
     new ShellCollector(config),
     new GitCollector(config),
+    new VSCodeCollector(config),
   ];
 
   const linker = new Linker(config.vaultRoot, config.projectAliasPath);
@@ -162,6 +169,7 @@ async function status(config: ReturnType<typeof loadConfig>) {
         shellHistoryFile: config.shellHistoryFile,
         statePath: config.statePath,
         vaultRoot: config.vaultRoot,
+        vscodeEventsPath: config.vscodeEventsPath,
       },
       null,
       2,
@@ -182,7 +190,7 @@ async function ingest(config: ReturnType<typeof loadConfig>, args: string[]) {
     process.exit(1);
   }
 
-  const knownSources: EventSource[] = ['browser', 'claude', 'copilot', 'gemini', 'git', 'manual', 'openclaw', 'shell'];
+  const knownSources: EventSource[] = ['browser', 'claude', 'copilot', 'gemini', 'git', 'manual', 'openclaw', 'shell', 'vscode'];
   const knownKinds: EventKind[] = ['activity', 'agent', 'capture', 'code', 'conversation', 'ops'];
   const source = knownSources.includes(flags.source as EventSource) ? (flags.source as EventSource) : 'manual';
   const kind = knownKinds.includes(flags.kind as EventKind) ? (flags.kind as EventKind) : 'capture';
@@ -206,6 +214,37 @@ async function ingest(config: ReturnType<typeof loadConfig>, args: string[]) {
   await fs.ensureDir(path.dirname(targetFile));
   await fs.appendFile(targetFile, `${JSON.stringify(event)}\n`, 'utf8');
   console.log(`Urchin: ingested ${source} event into ${targetFile}`);
+}
+
+async function ingestVSCode(config: ReturnType<typeof loadConfig>, args: string[]) {
+  const { flags, rest } = parseFlags(args);
+  const content = rest.join(' ').trim();
+  const workspacePath = flags.workspace;
+  const sessionId = flags.session;
+  if (!content || !workspacePath || !sessionId) {
+    console.error(
+      'Usage: urchin ingest-vscode --workspace /path/to/workspace --session session-id [--role user|assistant] [--file /path/to/file] [--title "Chat title"] "message"',
+    );
+    process.exit(1);
+  }
+
+  const event = {
+    id: randomUUID(),
+    content,
+    filePath: flags.file,
+    kind: flags.kind === 'agent' ? 'agent' : 'conversation',
+    role: flags.role,
+    selection: flags.selection,
+    sessionId,
+    summary: flags.summary,
+    timestamp: new Date().toISOString(),
+    title: flags.title,
+    workspacePath,
+  };
+
+  await fs.ensureDir(path.dirname(config.vscodeEventsPath));
+  await fs.appendFile(config.vscodeEventsPath, `${JSON.stringify(event)}\n`, 'utf8');
+  console.log(`Urchin: ingested vscode event into ${config.vscodeEventsPath}`);
 }
 
 main().catch((error) => {

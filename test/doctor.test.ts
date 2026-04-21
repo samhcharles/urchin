@@ -25,6 +25,7 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
     shellHistoryFile: path.join(root, '.bash_history'),
     statePath: path.join(root, '.state', 'urchin.json'),
     vaultRoot,
+    vscodeEventsPath: path.join(root, '.local', 'share', 'urchin', 'editors', 'vscode', 'events.jsonl'),
   };
 
   await fs.ensureDir(config.archiveRoot);
@@ -81,8 +82,10 @@ test('buildDoctorReport distinguishes reachable shipped collectors from planned 
     assert.ok(git);
     assert.equal(git.details?.discoveredRepos, 1);
 
+    assert.equal(report.sync.shippedSourceCount, 8);
+
     const vscodeSpike = report.spikes.find((spike) => spike.id === 'editor-vscode');
     assert.ok(vscodeSpike);
-    assert.equal(vscodeSpike.status, 'planned');
+    assert.equal(vscodeSpike.status, 'shipped');
   });
 });

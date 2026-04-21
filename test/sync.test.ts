@@ -47,6 +47,7 @@ async function withTempSyncHarness(
     shellHistoryFile: path.join(root, '.bash_history'),
     statePath: path.join(root, '.state', 'urchin.json'),
     vaultRoot,
+    vscodeEventsPath: path.join(root, '.local', 'share', 'urchin', 'editors', 'vscode', 'events.jsonl'),
   };
 
   await fs.ensureDir(path.join(vaultRoot, '10-projects'));

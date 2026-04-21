@@ -32,6 +32,32 @@ That keeps the contract simple:
 - editor side: emit durable events with provenance
 - Urchin side: normalize and sync
 
+## Shipped bridge: VS Code / VSCodium
+
+Urchin now ships one explicit editor path:
+
+1. a VS Code extension, script, or local automation writes append-only JSONL to `URCHIN_VSCODE_EVENTS_PATH`
+2. each event includes:
+   - `workspacePath`
+   - `sessionId`
+   - `content`
+3. optional fields like `filePath`, `role`, `selection`, `title`, and `kind` enrich the archive output
+4. `urchin sync` reads that queue through the dedicated `VSCodeCollector`
+
+Urchin also exposes a local CLI bridge for testing or simple integrations:
+
+```bash
+urchin ingest-vscode \
+  --workspace /path/to/repo \
+  --session chat-1 \
+  --file /path/to/repo/src/app.ts \
+  --role assistant \
+  --title "Copilot Chat" \
+  "Explained the refactor"
+```
+
+That is enough to make editor activity a shipped surface instead of a docs-only promise.
+
 ## Required provenance for editor events
 
 Editor-aware events should carry enough context to be useful later:

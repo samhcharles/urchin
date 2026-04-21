@@ -26,6 +26,7 @@ async function withTempVault(run: (config: UrchinConfig, linker: Linker) => Prom
     shellHistoryFile: path.join(root, '.bash_history'),
     statePath: path.join(root, '.state', 'urchin.json'),
     vaultRoot,
+    vscodeEventsPath: path.join(root, '.local', 'share', 'urchin', 'editors', 'vscode', 'events.jsonl'),
   };
 
   await fs.ensureDir(vaultRoot);

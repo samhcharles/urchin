@@ -15,6 +15,7 @@ export interface UrchinConfig {
   shellHistoryFile: string;
   statePath: string;
   vaultRoot: string;
+  vscodeEventsPath: string;
 }
 
 function expandHome(input: string): string {
@@ -58,5 +59,6 @@ export function loadConfig(): UrchinConfig {
     shellHistoryFile: expandHome(process.env.URCHIN_SHELL_HISTORY_FILE ?? '~/.bash_history'),
     statePath: expandHome(process.env.URCHIN_STATE_PATH ?? '~/.local/state/urchin/state.json'),
     vaultRoot,
+    vscodeEventsPath: expandHome(process.env.URCHIN_VSCODE_EVENTS_PATH ?? '~/.local/share/urchin/editors/vscode/events.jsonl'),
   };
 }

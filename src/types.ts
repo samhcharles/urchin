@@ -6,7 +6,8 @@ export type EventSource =
   | 'git'
   | 'manual'
   | 'openclaw'
-  | 'shell';
+  | 'shell'
+  | 'vscode';
 
 export type EventKind = 'activity' | 'agent' | 'capture' | 'code' | 'conversation' | 'ops';
 
