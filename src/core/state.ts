@@ -1,9 +1,19 @@
 import * as fs from 'fs-extra';
 
 import { writeJsonAtomic } from './io';
+import { EventSource } from '../types';
+
+export interface SourceSyncState {
+  eventCount?: number;
+  lastError?: string;
+  lastRunAt?: string;
+  lastSuccessAt?: string;
+}
 
 export interface UrchinState {
   lastSuccessfulSyncAt?: string;
+  lastSyncStartedAt?: string;
+  sources?: Partial<Record<EventSource, SourceSyncState>>;
 }
 
 export async function loadState(statePath: string): Promise<UrchinState> {

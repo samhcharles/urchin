@@ -29,8 +29,17 @@ function defaultSince(syncStartedAt: Date): Date {
   return new Date(syncStartedAt.getTime() - 24 * 60 * 60 * 1000);
 }
 
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+}
+
 export async function runSync(config: UrchinConfig, options: RunSyncOptions): Promise<SyncResult> {
   const syncStartedAt = options.now?.() ?? new Date();
+  const syncStartedAtIso = syncStartedAt.toISOString();
   const state = await loadState(config.statePath);
   const sinceDate = state.lastSuccessfulSyncAt
     ? new Date(state.lastSuccessfulSyncAt)
@@ -38,13 +47,27 @@ export async function runSync(config: UrchinConfig, options: RunSyncOptions): Pr
 
   let allEvents: UrchinEvent[] = [];
   const failedCollectors: SyncCollectorFailure[] = [];
+  const sources = { ...(state.sources ?? {}) };
 
   for (const collector of options.collectors) {
     try {
       const events = await collector.collect(sinceDate);
       allEvents.push(...events);
+      sources[collector.name] = {
+        ...sources[collector.name],
+        eventCount: events.length,
+        lastError: undefined,
+        lastRunAt: syncStartedAtIso,
+        lastSuccessAt: syncStartedAtIso,
+      };
     } catch (error) {
       failedCollectors.push({ collector: collector.name, error });
+      sources[collector.name] = {
+        ...sources[collector.name],
+        eventCount: 0,
+        lastError: formatError(error),
+        lastRunAt: syncStartedAtIso,
+      };
     }
   }
 
@@ -63,14 +86,17 @@ export async function runSync(config: UrchinConfig, options: RunSyncOptions): Pr
 
   await writeArchiveIndex(config);
 
-  if (failedCollectors.length === 0) {
-    await saveState(config.statePath, { lastSuccessfulSyncAt: syncStartedAt.toISOString() });
-  }
+  await saveState(config.statePath, {
+    ...state,
+    lastSyncStartedAt: syncStartedAtIso,
+    ...(failedCollectors.length === 0 ? { lastSuccessfulSyncAt: syncStartedAtIso } : {}),
+    sources,
+  });
 
   return {
     eventCount: sanitizedEvents.length,
     failedCollectors,
-    lastCheckpoint: syncStartedAt.toISOString(),
+    lastCheckpoint: syncStartedAtIso,
     sinceDate: sinceDate.toISOString(),
     writtenPaths,
   };

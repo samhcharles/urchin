@@ -12,6 +12,7 @@ import { IntakeCollector } from './collectors/intake';
 import { OpenClawCollector } from './collectors/openclaw';
 import { GitCollector, ShellCollector } from './collectors/shell';
 import { loadConfig } from './core/config';
+import { buildDoctorReport } from './core/doctor';
 import { runSync } from './core/sync';
 import { loadState } from './core/state';
 import { appendManualCapture } from './obsidian/writer';
@@ -70,6 +71,11 @@ async function main() {
 
   if (command === 'status') {
     await status(config);
+    return;
+  }
+
+  if (command === 'doctor') {
+    await doctor(config);
     return;
   }
 
@@ -161,6 +167,11 @@ async function status(config: ReturnType<typeof loadConfig>) {
       2,
     ),
   );
+}
+
+async function doctor(config: ReturnType<typeof loadConfig>) {
+  const report = await buildDoctorReport(config);
+  console.log(JSON.stringify(report, null, 2));
 }
 
 async function ingest(config: ReturnType<typeof loadConfig>, args: string[]) {

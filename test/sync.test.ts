@@ -116,5 +116,8 @@ test('runSync does not advance state when any collector fails', async () => {
     assert.equal(result.failedCollectors.length, 1);
     assert.equal(result.writtenPaths.length > 0, true);
     assert.equal(state.lastSuccessfulSyncAt, '2026-04-21T07:00:00.000Z');
+    assert.equal(state.lastSyncStartedAt, '2026-04-21T09:00:00.000Z');
+    assert.equal(state.sources.git.lastSuccessAt, '2026-04-21T09:00:00.000Z');
+    assert.equal(state.sources.claude.lastError, 'collector claude failed');
   });
 });

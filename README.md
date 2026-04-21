@@ -26,6 +26,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the core-plus-spikes mode
 - `urchin dump "text"` — append a manual capture into the Obsidian inbox
 - `urchin ingest --source browser --kind capture --scope network "captured text"` — append an external/browser-style event into the bounded intake queue
 - `urchin status` — show resolved config and sync state
+- `urchin doctor` — show blunt runtime diagnostics: what is shipped, what is reachable, what last ran, and what is still only planned
 
 If a collector fails during `urchin sync`, Urchin now refuses to advance the sync checkpoint. That keeps the next run from silently skipping activity.
 
@@ -55,7 +56,7 @@ Urchin defaults to the local paths used in this workflow, but every important pa
 | `URCHIN_SHELL_HISTORY_FILE` | `~/.bash_history` |
 | `URCHIN_REPOS_ROOTS` | `~/dev,~/repos` |
 
-For day-to-day use, start with `urchin status`, confirm the resolved paths, then run `urchin sync`.
+For day-to-day use, start with `urchin doctor`, confirm the reachable sources and runtime state, then run `urchin sync`.
 
 `URCHIN_PROJECT_ALIAS_PATH` lets you pin repo or workspace names to real project notes when the names do not line up exactly.
 
