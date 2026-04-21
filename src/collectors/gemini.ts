@@ -1,23 +1,29 @@
 import * as fs from 'fs-extra';
-import * as path from 'path';
-import * as os from 'os';
+import * as path from 'node:path';
+import { glob } from 'glob';
+
+import { UrchinConfig } from '../core/config';
+import { sanitize } from '../core/redaction';
 import { Collector, UrchinEvent } from '../types';
 
 export class GeminiCollector implements Collector {
   name: 'gemini' = 'gemini';
 
-  async collect(since?: Date): Promise<UrchinEvent[]> {
-    const chatDir = path.join(os.homedir(), '.gemini/tmp/samhc/chats');
-    if (!(await fs.pathExists(chatDir))) return [];
+  constructor(private readonly config: UrchinConfig) {}
 
-    const files = await fs.readdir(chatDir);
-    const jsonFiles = files.filter(f => f.endsWith('.json'));
+  async collect(since?: Date): Promise<UrchinEvent[]> {
+    if (!(await fs.pathExists(this.config.geminiTmpRoot))) return [];
+
+    const chatFiles = await glob('**/chats/*.json', {
+      cwd: this.config.geminiTmpRoot,
+      absolute: true,
+      ignore: ['**/node_modules/**'],
+    });
 
     let events: UrchinEvent[] = [];
 
-    for (const file of jsonFiles) {
+    for (const filePath of chatFiles) {
       try {
-        const filePath = path.join(chatDir, file);
         const stats = await fs.stat(filePath);
         if (since && stats.mtime < since) continue;
 
@@ -25,22 +31,31 @@ export class GeminiCollector implements Collector {
         if (data.messages && Array.isArray(data.messages)) {
           for (const msg of data.messages) {
             if (msg.type === 'user') {
-              const content = Array.isArray(msg.content) 
+              const content = Array.isArray(msg.content)
                 ? msg.content.map((c: any) => c.text).join('\n')
                 : msg.content;
-              
+
               events.push({
-                id: msg.id,
+                id: msg.id ?? `${data.sessionId ?? 'gemini'}-${msg.timestamp}`,
+                kind: 'conversation',
                 source: 'gemini',
                 timestamp: msg.timestamp,
+                summary: sanitize(content ?? '', 140).split('\n')[0] ?? 'Gemini event',
                 content: content,
-                metadata: { sessionId: data.sessionId }
+                tags: ['gemini', 'session'],
+                metadata: { sessionId: data.sessionId },
+                provenance: {
+                  adapter: 'gemini-chat-json',
+                  location: filePath,
+                  scope: 'local',
+                  sessionId: data.sessionId,
+                },
               });
             }
           }
         }
       } catch (err) {
-        console.error(`Error parsing Gemini chat file ${file}:`, err);
+        console.error(`Error parsing Gemini chat file ${filePath}:`, err);
       }
     }
 

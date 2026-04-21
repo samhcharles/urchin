@@ -1,12 +1,23 @@
 # Urchin
 
-A unified synthesis engine designed to bridge the gaps of scattered memory and context across development and AI tools.
+Urchin is a local-first context bridge that pulls scattered AI and workflow activity into an Obsidian brain without turning the vault into a dumping ground.
 
-## Features
-- **Passive Ingestion:** Scans history and logs from Gemini, Claude, Copilot, Git, and Shell.
-- **Synthesis & Auto-Linking:** Automatically deduplicates events and wraps known entities in `[[WikiLinks]]`.
-- **Obsidian Integration:** Funnels synthesized events into daily chronological timelines.
+## Current direction
 
-## Usage
-- `urchin`: Trigger a context sync.
-- `urchin dump "text"`: Instantly capture a thought with auto-linking.
+- **Core first:** config, provenance, redaction, checkpoints, deterministic vault writes
+- **Spikes later:** source adapters, intake adapters, enrichers, output writers
+- **Vault-aware:** archive layers live in the vault, but promotion into durable notes stays explicit
+
+## Commands
+
+- `urchin` or `urchin sync` — collect recent activity and write timeline notes
+- `urchin dump "text"` — append a manual capture into the Obsidian inbox
+- `urchin status` — show resolved config and sync state
+
+## Development
+
+```bash
+npm install
+npm run typecheck
+npm test
+```

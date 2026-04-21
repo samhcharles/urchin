@@ -1,13 +1,15 @@
 import * as fs from 'fs-extra';
-import * as path from 'path';
-import * as os from 'os';
+import { UrchinConfig } from '../core/config';
+import { sanitize } from '../core/redaction';
 import { Collector, UrchinEvent } from '../types';
 
 export class OpenClawCollector implements Collector {
   name: 'openclaw' = 'openclaw';
 
+  constructor(private readonly config: UrchinConfig) {}
+
   async collect(since?: Date): Promise<UrchinEvent[]> {
-    const logFile = path.join(os.homedir(), '.openclaw/logs/commands.log');
+    const logFile = this.config.openclawCommandsLog;
     if (!(await fs.pathExists(logFile))) return [];
 
     const rawData = await fs.readFile(logFile, 'utf-8');
@@ -24,9 +26,18 @@ export class OpenClawCollector implements Collector {
 
           events.push({
             id: 'openclaw-' + match[1],
+            kind: 'conversation',
             source: 'openclaw',
             timestamp: timestamp.toISOString(),
-            content: match[2]
+            summary: sanitize(match[2], 140).split('\n')[0] ?? 'OpenClaw event',
+            content: match[2],
+            tags: ['openclaw', 'command'],
+            metadata: {},
+            provenance: {
+              adapter: 'openclaw-commands-log',
+              location: logFile,
+              scope: 'local',
+            },
           });
         }
       } catch (err) {

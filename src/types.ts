@@ -1,11 +1,33 @@
-export type EventSource = 'gemini' | 'claude' | 'copilot' | 'shell' | 'openclaw' | 'git';
+export type EventSource =
+  | 'browser'
+  | 'claude'
+  | 'copilot'
+  | 'gemini'
+  | 'git'
+  | 'manual'
+  | 'openclaw'
+  | 'shell';
+
+export type EventKind = 'activity' | 'capture' | 'code' | 'conversation' | 'ops';
+
+export interface EventProvenance {
+  adapter: string;
+  location: string;
+  scope: 'local' | 'network';
+  repo?: string;
+  sessionId?: string;
+}
 
 export interface UrchinEvent {
   id: string;
+  kind: EventKind;
   source: EventSource;
-  timestamp: string; // ISO-8601
+  timestamp: string;
+  summary: string;
   content: string;
-  metadata?: Record<string, any>;
+  tags: string[];
+  metadata: Record<string, unknown>;
+  provenance: EventProvenance;
 }
 
 export interface Collector {

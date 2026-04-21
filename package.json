@@ -1,24 +1,42 @@
 {
   "name": "urchin",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "description": "Local-first context bridge for syncing scattered AI and workflow activity into Obsidian.",
+  "main": "dist/src/index.js",
+  "bin": {
+    "urchin": "dist/src/index.js"
   },
-  "keywords": [],
-  "author": "",
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "npm run build && node --test dist/test/**/*.test.js"
+  },
+  "keywords": [
+    "obsidian",
+    "knowledge",
+    "sync",
+    "context",
+    "agents"
+  ],
+  "author": "samhcharles",
   "license": "ISC",
   "type": "commonjs",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
+    "@types/glob": "^8.1.0",
     "@types/node": "^25.6.0",
     "fs-extra": "^11.3.4",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3"
   },
   "dependencies": {
-    "@types/glob": "^8.1.0",
     "glob": "^13.0.6"
   }
 }

@@ -1,15 +1,20 @@
-import * as fs from 'fs-extra';
-import * as path from 'path';
-import { GeminiCollector } from './collectors/gemini';
+#!/usr/bin/env node
+
 import { ClaudeCollector } from './collectors/claude';
+import { CopilotCollector } from './collectors/copilot';
+import { GeminiCollector } from './collectors/gemini';
 import { OpenClawCollector } from './collectors/openclaw';
-import { ShellCollector, GitCollector } from './collectors/shell';
+import { GitCollector, ShellCollector } from './collectors/shell';
+import { loadConfig } from './core/config';
+import { dedupeEvents } from './core/dedupe';
+import { sanitize } from './core/redaction';
+import { loadState, saveState } from './core/state';
+import { appendManualCapture, writeArchive, writeArchiveIndex } from './obsidian/writer';
 import { Linker } from './synthesis/linker';
 import { UrchinEvent } from './types';
 
-const VAULT_ROOT = '/home/samhc/dev/openclaw-workspace';
-
 async function main() {
+  const config = loadConfig();
   const args = process.argv.slice(2);
   const command = args[0];
 
@@ -19,43 +24,44 @@ async function main() {
       console.error('Usage: urchin dump "your thought"');
       process.exit(1);
     }
-    await dumpThought(text);
+
+    await dumpThought(config, text);
     return;
   }
 
-  await sync();
+  if (command === 'status') {
+    await status(config);
+    return;
+  }
+
+  await sync(config);
 }
 
-async function dumpThought(text: string) {
-  const today = new Date().toISOString().split('T')[0];
-  const dumpFile = path.join(VAULT_ROOT, 'INBOX.md');
-  const timestamp = new Date().toLocaleTimeString();
-  
-  const linker = new Linker(VAULT_ROOT);
+async function dumpThought(config: ReturnType<typeof loadConfig>, text: string) {
+  const linker = new Linker(config.vaultRoot);
   await linker.initialize();
-  const linkedText = linker.link(text);
-
-  const entry = `\n- [ ] ${timestamp}: ${linkedText} #urchin-dump\n`;
-  await fs.ensureDir(path.dirname(dumpFile));
-  await fs.appendFile(dumpFile, entry);
-  console.log(`Urchin: Thought dumped to INBOX.md`);
+  await appendManualCapture(config, linker, text);
+  console.log(`Urchin: capture written to ${config.inboxCapturePath}`);
 }
 
-async function sync() {
-  const sinceDate = new Date();
-  sinceDate.setHours(sinceDate.getHours() - 24);
+async function sync(config: ReturnType<typeof loadConfig>) {
+  const state = await loadState(config.statePath);
+  const sinceDate = state.lastSuccessfulSyncAt
+    ? new Date(state.lastSuccessfulSyncAt)
+    : new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  console.log(`Urchin: Syncing context since ${sinceDate.toISOString()}`);
+  console.log(`Urchin: syncing context since ${sinceDate.toISOString()}`);
 
   const collectors = [
-    new GeminiCollector(),
-    new ClaudeCollector(),
-    new OpenClawCollector(),
-    new ShellCollector(),
-    new GitCollector()
+    new CopilotCollector(config),
+    new GeminiCollector(config),
+    new ClaudeCollector(config),
+    new OpenClawCollector(config),
+    new ShellCollector(config),
+    new GitCollector(config),
   ];
 
-  const linker = new Linker(VAULT_ROOT);
+  const linker = new Linker(config.vaultRoot);
   await linker.initialize();
 
   let allEvents: UrchinEvent[] = [];
@@ -64,61 +70,53 @@ async function sync() {
     try {
       const events = await collector.collect(sinceDate);
       allEvents.push(...events);
-    } catch (err) {
-      console.error(`Error in collector ${collector.name}:`, err);
+    } catch (error) {
+      console.error(`Error in collector ${collector.name}:`, error);
     }
   }
 
-  // Deduplicate and Sort
   allEvents.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  
-  const uniqueEvents = allEvents.filter((event, index, self) =>
-    index === self.findIndex((e) => (
-      e.content === event.content && 
-      e.source === event.source &&
-      Math.abs(new Date(e.timestamp).getTime() - new Date(event.timestamp).getTime()) < 1000
-    ))
-  );
+  const uniqueEvents = dedupeEvents(allEvents);
 
   if (uniqueEvents.length === 0) {
-    console.log('No new events to sync.');
+    console.log('Urchin: no new events to sync.');
     return;
   }
 
-  const today = new Date().toISOString().split('T')[0];
-  const outputPath = path.join(VAULT_ROOT, 'memory', `${today}-urchin.md`);
+  const sanitizedEvents = uniqueEvents.map((event) => ({
+    ...event,
+    summary: sanitize(event.summary, 240),
+    content: sanitize(event.content),
+  }));
 
-  let markdown = `# Urchin Timeline: ${today}\n\n`;
-  
-  for (const event of uniqueEvents) {
-    const timeStr = new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const sourceIcon = getSourceIcon(event.source);
-    const linkedContent = linker.link(event.content);
+  const writtenPaths = await writeArchive(config, linker, sanitizedEvents);
+  await writeArchiveIndex(config, writtenPaths);
+  await saveState(config.statePath, { lastSuccessfulSyncAt: new Date().toISOString() });
 
-    markdown += `### ${sourceIcon} ${timeStr} (${event.source})\n`;
-    markdown += `${linkedContent}\n\n`;
-    if (event.metadata && event.metadata.repo) {
-      markdown += `*Repo: [[${event.metadata.repo}]]*\n\n`;
-    }
-    markdown += `---\n\n`;
-  }
-
-  await fs.ensureDir(path.dirname(outputPath));
-  await fs.writeFile(outputPath, markdown);
-
-  console.log(`Urchin: Timeline updated at ${outputPath}`);
+  console.log(`Urchin: updated ${writtenPaths.length} timeline note(s) under ${config.archiveRoot}`);
 }
 
-function getSourceIcon(source: string): string {
-  switch (source) {
-    case 'gemini': return '♊';
-    case 'claude': return '🎭';
-    case 'copilot': return '🤖';
-    case 'shell': return '🐚';
-    case 'openclaw': return '🦾';
-    case 'git': return '📦';
-    default: return '📍';
-  }
+async function status(config: ReturnType<typeof loadConfig>) {
+  const state = await loadState(config.statePath);
+  console.log(
+    JSON.stringify(
+      {
+        archiveRoot: config.archiveRoot,
+        claudeHistoryFile: config.claudeHistoryFile,
+        copilotSessionRoot: config.copilotSessionRoot,
+        geminiTmpRoot: config.geminiTmpRoot,
+        inboxCapturePath: config.inboxCapturePath,
+        lastSuccessfulSyncAt: state.lastSuccessfulSyncAt ?? null,
+        openclawCommandsLog: config.openclawCommandsLog,
+        reposRoots: config.reposRoots,
+        shellHistoryFile: config.shellHistoryFile,
+        statePath: config.statePath,
+        vaultRoot: config.vaultRoot,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 main().catch(console.error);

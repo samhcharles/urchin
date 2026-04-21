@@ -1,13 +1,15 @@
 import * as fs from 'fs-extra';
-import * as path from 'path';
-import * as os from 'os';
+import { UrchinConfig } from '../core/config';
+import { sanitize } from '../core/redaction';
 import { Collector, UrchinEvent } from '../types';
 
 export class ClaudeCollector implements Collector {
   name: 'claude' = 'claude';
 
+  constructor(private readonly config: UrchinConfig) {}
+
   async collect(since?: Date): Promise<UrchinEvent[]> {
-    const historyFile = path.join(os.homedir(), '.claude/history.jsonl');
+    const historyFile = this.config.claudeHistoryFile;
     if (!(await fs.pathExists(historyFile))) return [];
 
     const rawData = await fs.readFile(historyFile, 'utf-8');
@@ -23,10 +25,19 @@ export class ClaudeCollector implements Collector {
 
         events.push({
           id: entry.sessionId + '-' + entry.timestamp,
+          kind: 'conversation',
           source: 'claude',
           timestamp: timestamp.toISOString(),
+          summary: sanitize(entry.display ?? '', 140).split('\n')[0] ?? 'Claude event',
           content: entry.display,
-          metadata: { sessionId: entry.sessionId, project: entry.project }
+          tags: ['claude', 'session'],
+          metadata: { sessionId: entry.sessionId, project: entry.project },
+          provenance: {
+            adapter: 'claude-history-jsonl',
+            location: historyFile,
+            scope: 'local',
+            sessionId: entry.sessionId,
+          },
         });
       } catch (err) {
         console.error(`Error parsing Claude line:`, err);
