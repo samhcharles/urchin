@@ -1,7 +1,9 @@
+import * as os from 'node:os';
 import * as fs from 'fs-extra';
 import { constants } from 'node:fs';
 import * as path from 'node:path';
 
+import { getPersonalAutomationState, resolvePersonalPaths } from '../bootstrap/personal';
 import { UrchinConfig } from './config';
 import { loadState, SourceSyncState } from './state';
 import { EventSource } from '../types';
@@ -30,6 +32,19 @@ export interface DoctorSpikeReport {
 }
 
 export interface DoctorReport {
+  automation: {
+    envPath: string;
+    envExists: boolean;
+    personalNotePath: string;
+    personalNoteExists: boolean;
+    servicePath: string;
+    serviceInstalled: boolean;
+    systemdAvailable: boolean;
+    timerActive: boolean | null;
+    timerEnabled: boolean | null;
+    timerPath: string;
+    timerInstalled: boolean;
+  };
   generatedAt: string;
   overallStatus: 'ok' | 'warning';
   vault: {
@@ -49,6 +64,10 @@ export interface DoctorReport {
   };
   sources: DoctorSourceReport[];
   spikes: DoctorSpikeReport[];
+}
+
+export interface DoctorOptions {
+  homeRoot?: string;
 }
 
 interface SourceSpec {
@@ -220,11 +239,29 @@ async function inspectPaths(paths: string[]): Promise<DoctorPathReport[]> {
   );
 }
 
-export async function buildDoctorReport(config: UrchinConfig, now: () => Date = () => new Date()): Promise<DoctorReport> {
+export async function buildDoctorReport(
+  config: UrchinConfig,
+  now: () => Date = () => new Date(),
+  options: DoctorOptions = {},
+): Promise<DoctorReport> {
+  const homeRoot = options.homeRoot ?? os.homedir();
   const state = await loadState(config.statePath);
   const vaultExists = await fs.pathExists(config.vaultRoot);
   const archiveRootExists = await fs.pathExists(config.archiveRoot);
   const stateFileExists = await fs.pathExists(config.statePath);
+  const personalPaths = resolvePersonalPaths(config, homeRoot);
+  const personalState = await getPersonalAutomationState(homeRoot);
+  const [
+    envExists,
+    personalNoteExists,
+    serviceInstalled,
+    timerInstalled,
+  ] = await Promise.all([
+    fs.pathExists(personalPaths.envPath),
+    fs.pathExists(personalPaths.notePath),
+    fs.pathExists(personalPaths.servicePath),
+    fs.pathExists(personalPaths.timerPath),
+  ]);
 
   const sources = await Promise.all(
     SOURCE_SPECS.map(async (spec) => {
@@ -250,6 +287,19 @@ export async function buildDoctorReport(config: UrchinConfig, now: () => Date = 
     writable && connectedSourceCount > 0 && !hasRuntimeFailures ? 'ok' : 'warning';
 
   return {
+    automation: {
+      envExists,
+      envPath: personalPaths.envPath,
+      personalNoteExists,
+      personalNotePath: personalPaths.notePath,
+      serviceInstalled,
+      servicePath: personalPaths.servicePath,
+      systemdAvailable: personalState.systemdAvailable,
+      timerActive: personalState.timerActive,
+      timerEnabled: personalState.timerEnabled,
+      timerInstalled,
+      timerPath: personalPaths.timerPath,
+    },
     generatedAt: now().toISOString(),
     overallStatus,
     vault: {

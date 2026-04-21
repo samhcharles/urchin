@@ -60,6 +60,12 @@ Urchin should support two safe install modes:
 
 The install layer should stay separate from the sync core. Scaffolding is adoption help, not the brain itself.
 
+Urchin now also has a personal-workflow bootstrap layer:
+
+- a generated env file for the real local paths in use
+- a user-level systemd service/timer for background sync
+- a vault note that acts as the user's operating surface for the live setup
+
 ## Development guardrails
 
 - local files first

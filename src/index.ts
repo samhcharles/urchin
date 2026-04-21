@@ -5,6 +5,7 @@ import * as fs from 'fs-extra';
 import * as path from 'node:path';
 
 import { initializeVault, InitMode } from './bootstrap/init';
+import { setupPersonalWorkflow } from './bootstrap/personal';
 import { ClaudeCollector } from './collectors/claude';
 import { CopilotCollector } from './collectors/copilot';
 import { GeminiCollector } from './collectors/gemini';
@@ -75,6 +76,11 @@ async function main() {
     return;
   }
 
+  if (command === 'setup-personal') {
+    await setupPersonal(config, args.slice(1));
+    return;
+  }
+
   if (command === 'status') {
     await status(config);
     return;
@@ -111,6 +117,49 @@ async function init(config: ReturnType<typeof loadConfig>, args: string[]) {
   if (result.reused.length > 0) {
     console.log(`Urchin: reused ${result.reused.length} existing path(s)`);
   }
+}
+
+function applyVaultOverride(config: ReturnType<typeof loadConfig>, vaultRoot?: string) {
+  if (!vaultRoot) {
+    return config;
+  }
+
+  const resolvedVaultRoot = path.resolve(vaultRoot);
+  return {
+    ...config,
+    archiveIndexPath: path.join(resolvedVaultRoot, '40-archive', 'urchin', 'index.md'),
+    archiveRoot: path.join(resolvedVaultRoot, '40-archive', 'urchin'),
+    inboxCapturePath: path.join(resolvedVaultRoot, '00-inbox', 'urchin-capture.md'),
+    vaultRoot: resolvedVaultRoot,
+  };
+}
+
+async function setupPersonal(config: ReturnType<typeof loadConfig>, args: string[]) {
+  const { flags } = parseFlags(args);
+  const mode: InitMode = flags.mode === 'starter' ? 'starter' : 'existing';
+  const effectiveConfig = applyVaultOverride(config, flags.vault);
+
+  await initializeVault({
+    config: effectiveConfig,
+    mode,
+    vaultRoot: flags.vault,
+  });
+
+  const result = await setupPersonalWorkflow({
+    config: effectiveConfig,
+    enableSystemd: flags.enable === 'true',
+  });
+
+  console.log(`Urchin: personal workflow setup written to ${result.written.length} path(s).`);
+  if (result.created.length > 0) {
+    console.log(`Urchin: created ${result.created.length} new personal workflow path(s).`);
+  }
+  if (result.updated.length > 0) {
+    console.log(`Urchin: updated ${result.updated.length} existing personal workflow path(s).`);
+  }
+  console.log(`Urchin: systemd available: ${result.state.systemdAvailable}`);
+  console.log(`Urchin: timer enabled: ${result.state.timerEnabled === null ? 'unknown' : result.state.timerEnabled}`);
+  console.log(`Urchin: timer active: ${result.state.timerActive === null ? 'unknown' : result.state.timerActive}`);
 }
 
 async function sync(config: ReturnType<typeof loadConfig>) {

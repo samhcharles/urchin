@@ -23,6 +23,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the core-plus-spikes mode
 
 - `urchin init --mode existing` — wire Urchin into an existing vault without destructive scaffolding
 - `urchin init --mode starter --vault /path/to/vault` — scaffold a starter vault layout for Urchin
+- `urchin setup-personal --mode existing --enable true` — write a personal env file, systemd timer, and personal-use note for the real daily workflow
 - `urchin` or `urchin sync` — collect recent activity and write timeline notes
 - `urchin dump "text"` — append a manual capture into the Obsidian inbox
 - `urchin ingest --source browser --kind capture --scope network "captured text"` — append an external/browser-style event into the bounded intake queue
@@ -59,9 +60,28 @@ Urchin defaults to the local paths used in this workflow, but every important pa
 | `URCHIN_REPOS_ROOTS` | `~/dev,~/repos` |
 | `URCHIN_VSCODE_EVENTS_PATH` | `~/.local/share/urchin/editors/vscode/events.jsonl` |
 
-For day-to-day use, start with `urchin doctor`, confirm the reachable sources and runtime state, then run `urchin sync`.
+For day-to-day use, start with `urchin setup-personal --enable true`, then use `urchin doctor` to confirm the timer, reachable sources, and runtime state.
 
 `URCHIN_PROJECT_ALIAS_PATH` lets you pin repo or workspace names to real project notes when the names do not line up exactly.
+
+## Personal workflow
+
+If you want Urchin to feel like part of your real stack instead of a repo you manually poke:
+
+```bash
+npm install
+npm run build
+node dist/src/index.js setup-personal --mode existing --enable true
+node dist/src/index.js doctor
+```
+
+That writes:
+
+- a personal env file at `~/.config/urchin/personal.env`
+- a user service and timer at `~/.config/systemd/user/urchin.{service,timer}`
+- a personal operating note at `30-resources/ai/urchin-personal.md`
+
+The timer keeps `urchin sync` moving in the background on a steady cadence, and the note gives you one place in the vault to check the current working setup.
 
 Urchin now supports two install modes:
 

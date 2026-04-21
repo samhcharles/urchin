@@ -61,13 +61,29 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
 }
 
 test('buildDoctorReport distinguishes reachable shipped collectors from planned spikes', async () => {
-  await withTempConfig(async (config) => {
-    const report = await buildDoctorReport(config, () => new Date('2026-04-21T10:00:00.000Z'));
+  await withTempConfig(async (config, root) => {
+    await fs.ensureDir(path.join(root, '.config', 'urchin'));
+    await fs.ensureDir(path.join(root, '.config', 'systemd', 'user'));
+    await fs.writeFile(path.join(root, '.config', 'urchin', 'personal.env'), 'URCHIN_VAULT_ROOT="/tmp/vault"\n', 'utf8');
+    await fs.writeFile(path.join(root, '.config', 'systemd', 'user', 'urchin.service'), '[Service]\n', 'utf8');
+    await fs.writeFile(path.join(root, '.config', 'systemd', 'user', 'urchin.timer'), '[Timer]\n', 'utf8');
+    await fs.ensureDir(path.join(config.vaultRoot, '30-resources', 'ai'));
+    await fs.writeFile(path.join(config.vaultRoot, '30-resources', 'ai', 'urchin-personal.md'), '# Personal\n', 'utf8');
+
+    const report = await buildDoctorReport(
+      config,
+      () => new Date('2026-04-21T10:00:00.000Z'),
+      { homeRoot: root },
+    );
 
     assert.equal(report.generatedAt, '2026-04-21T10:00:00.000Z');
     assert.equal(report.vault.writable, true);
     assert.equal(report.sync.lastSuccessfulSyncAt, '2026-04-21T08:00:00.000Z');
     assert.equal(report.sync.connectedSourceCount >= 1, true);
+    assert.equal(report.automation.envExists, true);
+    assert.equal(report.automation.serviceInstalled, true);
+    assert.equal(report.automation.timerInstalled, true);
+    assert.equal(report.automation.personalNoteExists, true);
 
     const copilot = report.sources.find((source) => source.source === 'copilot');
     assert.ok(copilot);
