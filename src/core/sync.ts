@@ -1,3 +1,5 @@
+import * as fs from 'fs-extra';
+import * as path from 'node:path';
 import { Linker } from '../synthesis/linker';
 import { Collector, UrchinEvent } from '../types';
 import { UrchinConfig } from './config';
@@ -55,6 +57,31 @@ function formatError(error: unknown): string {
   }
 
   return String(error);
+}
+
+const CACHE_MAX_DAYS = 30;
+
+async function appendEventCache(config: UrchinConfig, events: UrchinEvent[]): Promise<void> {
+  await fs.ensureDir(path.dirname(config.eventCachePath));
+  const newLines = events.map((e) => JSON.stringify(e)).join('\n') + '\n';
+  await fs.appendFile(config.eventCachePath, newLines, 'utf8');
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - CACHE_MAX_DAYS);
+  const raw = await fs.readFile(config.eventCachePath, 'utf8');
+  const kept = raw
+    .split('\n')
+    .filter((line) => {
+      if (!line.trim()) return false;
+      try {
+        const e = JSON.parse(line) as { timestamp?: string };
+        return typeof e.timestamp === 'string' && new Date(e.timestamp) >= cutoff;
+      } catch {
+        return false;
+      }
+    })
+    .join('\n') + '\n';
+  await fs.writeFile(config.eventCachePath, kept, 'utf8');
 }
 
 export async function runSync(config: UrchinConfig, options: RunSyncOptions): Promise<SyncResult> {
@@ -144,6 +171,9 @@ export async function runSync(config: UrchinConfig, options: RunSyncOptions): Pr
         };
 
   await writeArchiveIndex(config);
+  if (sanitizedEvents.length > 0) {
+    await appendEventCache(config, sanitizedEvents);
+  }
 
   await saveState(config.statePath, {
     ...state,
