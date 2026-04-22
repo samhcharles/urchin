@@ -21,6 +21,7 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
     inboxCapturePath: path.join(vaultRoot, '00-inbox', 'urchin-capture.md'),
     intakeRoot: path.join(root, 'intake'),
     openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
+    openclawCronRunsDir: path.join(root, '.openclaw', 'cron', 'runs'),
     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     reposRoots: [path.join(root, 'dev'), path.join(root, 'repos')],
     shellIgnorePrefixes: ['cd', 'ls'],
@@ -80,6 +81,10 @@ test('buildDoctorReport distinguishes reachable shipped collectors from planned 
     await fs.writeFile(path.join(root, '.config', 'systemd', 'user', 'urchin.timer'), '[Timer]\n', 'utf8');
     await fs.ensureDir(path.join(config.vaultRoot, '30-resources', 'ai'));
     await fs.writeFile(path.join(config.vaultRoot, '30-resources', 'ai', 'urchin-personal.md'), '# Personal\n', 'utf8');
+    await fs.ensureDir(path.dirname(config.openclawCommandsLog));
+    await fs.writeFile(config.openclawCommandsLog, '', 'utf8');
+    await fs.ensureDir(config.openclawCronRunsDir);
+    await fs.writeFile(path.join(config.openclawCronRunsDir, 'daily-brief.jsonl'), '{}\n', 'utf8');
 
     const report = await buildDoctorReport(
       config,
@@ -110,6 +115,11 @@ test('buildDoctorReport distinguishes reachable shipped collectors from planned 
     const claude = report.sources.find((source) => source.source === 'claude');
     assert.ok(claude);
     assert.equal(claude.status, 'partial');
+
+    const openclaw = report.sources.find((source) => source.source === 'openclaw');
+    assert.ok(openclaw);
+    assert.equal(openclaw.status, 'ready');
+    assert.equal(openclaw.details?.cronRunFiles, 1);
 
     const git = report.sources.find((source) => source.source === 'git');
     assert.ok(git);

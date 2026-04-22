@@ -145,11 +145,22 @@ const SOURCE_SPECS: SourceSpec[] = [
   },
   {
     source: 'openclaw',
-    label: 'OpenClaw command collector',
+    label: 'OpenClaw collector (commands + cron runs)',
     category: 'collector',
-    note: 'Reads append-style OpenClaw command logs when present.',
-    paths: (config) => [config.openclawCommandsLog],
-    status: ([file]) => (file?.exists ? 'ready' : 'missing'),
+    note: 'Reads OpenClaw command logs and cron run JSONL files. Cron runs surface daily brief, maintenance, and brain-sync summaries.',
+    paths: (config) => [config.openclawCommandsLog, config.openclawCronRunsDir],
+    status: (paths) => {
+      const existing = paths.filter((entry) => entry.exists).length;
+      if (existing === 2) return 'ready';
+      if (existing === 1) return 'partial';
+      return 'missing';
+    },
+    details: async (config, paths) => {
+      const runsDir = paths[1];
+      if (!runsDir?.exists) return { cronRunFiles: 0 };
+      const files = await fs.readdir(runsDir.path).catch(() => [] as string[]);
+      return { cronRunFiles: files.filter((f) => f.endsWith('.jsonl')).length };
+    },
   },
   {
     source: 'shell',

@@ -20,6 +20,7 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
     inboxCapturePath: path.join(vaultRoot, '00-inbox', 'urchin-capture.md'),
     intakeRoot: path.join(root, 'intake'),
     openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
+    openclawCronRunsDir: path.join(root, '.openclaw', 'cron', 'runs'),
     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     reposRoots: [path.join(root, 'dev')],
     shellIgnorePrefixes: ['cd', 'ls'],

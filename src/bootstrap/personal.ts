@@ -79,6 +79,7 @@ function buildEnvFile(config: UrchinConfig): string {
     envLine('URCHIN_CLAUDE_HISTORY_FILE', config.claudeHistoryFile),
     envLine('URCHIN_GEMINI_TMP_ROOT', config.geminiTmpRoot),
     envLine('URCHIN_OPENCLAW_COMMANDS_LOG', config.openclawCommandsLog),
+    envLine('URCHIN_OPENCLAW_CRON_RUNS_DIR', config.openclawCronRunsDir),
     envLine('URCHIN_PROJECT_ALIAS_PATH', config.projectAliasPath),
     envLine('URCHIN_SHELL_HISTORY_FILE', config.shellHistoryFile),
     envLine('URCHIN_REPOS_ROOTS', config.reposRoots.join(',')),
@@ -158,6 +159,8 @@ function buildPersonalNote(config: UrchinConfig, state: PersonalAutomationState)
     `- Copilot session-state: \`${config.copilotSessionRoot}\``,
     `- Claude history: \`${config.claudeHistoryFile}\``,
     `- Gemini root: \`${config.geminiTmpRoot}\``,
+    `- OpenClaw commands log: \`${config.openclawCommandsLog}\``,
+    `- OpenClaw cron runs: \`${config.openclawCronRunsDir}\``,
     `- Repo roots: \`${config.reposRoots.join(', ')}\``,
   ].join('\n') + '\n';
 }

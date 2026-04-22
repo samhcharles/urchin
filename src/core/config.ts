@@ -12,6 +12,7 @@ export interface UrchinConfig {
   inboxCapturePath: string;
   intakeRoot: string;
   openclawCommandsLog: string;
+  openclawCronRunsDir: string;
   projectAliasPath: string;
   reposRoots: string[];
   shellIgnorePrefixes: string[];
@@ -73,6 +74,7 @@ export function loadConfig(): UrchinConfig {
     inboxCapturePath: expandHome(process.env.URCHIN_INBOX_CAPTURE_PATH ?? path.join(vaultRoot, '00-inbox', 'urchin-capture.md')),
     intakeRoot: expandHome(process.env.URCHIN_INTAKE_ROOT ?? '~/.local/share/urchin/intake'),
     openclawCommandsLog: expandHome(process.env.URCHIN_OPENCLAW_COMMANDS_LOG ?? '~/.openclaw/logs/commands.log'),
+    openclawCronRunsDir: expandHome(process.env.URCHIN_OPENCLAW_CRON_RUNS_DIR ?? '~/.openclaw/cron/runs'),
     projectAliasPath: expandHome(process.env.URCHIN_PROJECT_ALIAS_PATH ?? '~/.config/urchin/project-aliases.json'),
     reposRoots: splitPaths(process.env.URCHIN_REPOS_ROOTS, [expandHome('~/dev'), expandHome('~/repos')]),
     shellIgnorePrefixes: splitList(process.env.URCHIN_SHELL_IGNORE_PREFIXES, ['cd', 'ls', 'pwd', 'clear', 'history', 'exit']),

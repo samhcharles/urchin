@@ -57,6 +57,7 @@ Urchin defaults to the local paths used in this workflow, but every important pa
 | `URCHIN_CLAUDE_HISTORY_FILE` | `~/.claude/history.jsonl` |
 | `URCHIN_GEMINI_TMP_ROOT` | `~/.gemini/tmp` |
 | `URCHIN_OPENCLAW_COMMANDS_LOG` | `~/.openclaw/logs/commands.log` |
+| `URCHIN_OPENCLAW_CRON_RUNS_DIR` | `~/.openclaw/cron/runs` |
 | `URCHIN_PROJECT_ALIAS_PATH` | `~/.config/urchin/project-aliases.json` |
 | `URCHIN_GIT_AUTHOR` | unset (falls back to repo `git config user.name`) |
 | `URCHIN_SHELL_HISTORY_FILE` | `~/.bash_history` |

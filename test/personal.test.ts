@@ -20,6 +20,7 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
     inboxCapturePath: path.join(vaultRoot, '00-inbox', 'urchin-capture.md'),
     intakeRoot: path.join(root, 'intake'),
     openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
+    openclawCronRunsDir: path.join(root, '.openclaw', 'cron', 'runs'),
     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     reposRoots: [path.join(root, 'dev')],
     shellIgnorePrefixes: ['cd', 'ls'],
@@ -64,10 +65,12 @@ test('setupPersonalWorkflow writes the personal env, systemd units, and workflow
     assert.equal(result.written.length, 4);
     assert.match(env, /URCHIN_VAULT_ROOT/);
     assert.match(env, /URCHIN_AGENT_EVENTS_PATH/);
+    assert.match(env, /URCHIN_OPENCLAW_CRON_RUNS_DIR/);
     assert.match(service, /ExecStart="\/usr\/bin\/node" "\/tmp\/urchin\/dist\/src\/index\.js" sync/);
     assert.match(timer, /OnUnitActiveSec=5m/);
     assert.match(note, /Urchin Personal Workflow/);
     assert.match(note, /Agent bridge queue/);
+    assert.match(note, /OpenClaw cron runs/);
   });
 });
 

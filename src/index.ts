@@ -255,6 +255,7 @@ async function status(config: ReturnType<typeof loadConfig>) {
         intakeRoot: config.intakeRoot,
         lastSuccessfulSyncAt: state.lastSuccessfulSyncAt ?? null,
         openclawCommandsLog: config.openclawCommandsLog,
+        openclawCronRunsDir: config.openclawCronRunsDir,
         projectAliasPath: config.projectAliasPath,
         reposRoots: config.reposRoots,
         shellHistoryFile: config.shellHistoryFile,
