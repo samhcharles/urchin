@@ -5,6 +5,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { UrchinConfig } from '../core/config';
+import { loadState } from '../core/state';
 import { EventSource } from '../types';
 import { readCachedEvents } from './reader';
 
@@ -123,6 +124,16 @@ const TOOL_DEFINITIONS = [
         },
       },
       required: ['query'],
+    },
+  },
+  {
+    name: 'urchin_status',
+    description:
+      'Returns the current status of the Urchin context sync system: last sync time, event cache size, active sources, and whether the HTTP intake server is running. Call this at the start of any session to confirm urchin is capturing this work.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
     },
   },
 ];
@@ -260,6 +271,60 @@ export async function startMcpServer(config: UrchinConfig): Promise<void> {
       return {
         content: [{ type: 'text', text: formatEvents(matched) }],
       };
+    }
+
+    if (name === 'urchin_status') {
+      const state = await loadState(config.statePath).catch(() => null);
+      const lastSyncAt = state?.lastSuccessfulSyncAt ?? null;
+
+      let lastSyncAgo = 'never';
+      if (lastSyncAt) {
+        const diffMs = Date.now() - new Date(lastSyncAt).getTime();
+        const mins = Math.floor(diffMs / 60000);
+        lastSyncAgo = mins < 60
+          ? `${mins} minute${mins === 1 ? '' : 's'} ago`
+          : `${Math.floor(mins / 60)} hour${Math.floor(mins / 60) === 1 ? '' : 's'} ago`;
+      }
+
+      let eventCacheSize = 0;
+      if (await fs.pathExists(config.eventCachePath)) {
+        const raw = await fs.readFile(config.eventCachePath, 'utf8');
+        eventCacheSize = raw.split('\n').filter((l) => l.trim()).length;
+      }
+
+      let intakeServerPort: number | null = null;
+      let intakeServerRunning = false;
+      if (await fs.pathExists(config.intakePortFile)) {
+        const portStr = (await fs.readFile(config.intakePortFile, 'utf8')).trim();
+        const portNum = Number(portStr);
+        if (!Number.isNaN(portNum)) {
+          intakeServerPort = portNum;
+          intakeServerRunning = await new Promise<boolean>((resolve) => {
+            import('node:http').then(({ request }) => {
+              const req = request(
+                { hostname: '127.0.0.1', port: portNum, path: '/health', method: 'GET', timeout: 1000 },
+                (res) => resolve(res.statusCode === 200),
+              );
+              req.on('error', () => resolve(false));
+              req.on('timeout', () => { req.destroy(); resolve(false); });
+              req.end();
+            }).catch(() => resolve(false));
+          });
+        }
+      }
+
+      const statusPayload = {
+        running: true,
+        lastSyncAt,
+        lastSyncAgo,
+        eventCacheSize,
+        intakeServerPort,
+        intakeServerRunning,
+        vaultRoot: config.vaultRoot,
+        eventCachePath: config.eventCachePath,
+      };
+
+      return { content: [{ type: 'text', text: JSON.stringify(statusPayload, null, 2) }] };
     }
 
     return { content: [{ type: 'text', text: `Unknown tool: ${name}` }], isError: true };
