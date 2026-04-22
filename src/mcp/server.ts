@@ -1,0 +1,178 @@
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { UrchinConfig } from '../core/config';
+import { EventSource } from '../types';
+import { readCachedEvents } from './reader';
+
+const KNOWN_SOURCES: EventSource[] = [
+  'agent', 'browser', 'claude', 'copilot', 'gemini', 'git', 'manual', 'openclaw', 'shell', 'vscode',
+];
+
+const TOOL_DEFINITIONS = [
+  {
+    name: 'urchin_recent_activity',
+    description:
+      'Returns recent activity events collected by Urchin from local AI tools and workflow sources (Claude, OpenClaw, git, shell, VS Code, Gemini, Copilot, etc.). Use this to understand what was worked on recently.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        hours: {
+          type: 'number',
+          description: 'How many hours back to look (default: 24)',
+        },
+        source: {
+          type: 'string',
+          description: 'Filter by source: claude, openclaw, git, shell, vscode, gemini, copilot, agent, browser',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum events to return (default: 20)',
+        },
+      },
+    },
+  },
+  {
+    name: 'urchin_project_context',
+    description:
+      'Returns events related to a specific project, matched by project name in tags, summary, or content. Useful for getting context on a codebase or task before working on it.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        project: {
+          type: 'string',
+          description: 'Project name or path fragment (e.g. "urchin", "openclaw", "snek")',
+        },
+        hours: {
+          type: 'number',
+          description: 'How many hours back to look (default: 168, i.e. 7 days)',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum events to return (default: 30)',
+        },
+      },
+      required: ['project'],
+    },
+  },
+  {
+    name: 'urchin_search',
+    description:
+      'Full-text search over recent Urchin events. Searches summary and content fields. Useful for finding when a topic was discussed or worked on.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query (case-insensitive substring match)',
+        },
+        hours: {
+          type: 'number',
+          description: 'How many hours back to search (default: 168, i.e. 7 days)',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum events to return (default: 20)',
+        },
+      },
+      required: ['query'],
+    },
+  },
+];
+
+function hoursAgo(hours: number): Date {
+  return new Date(Date.now() - hours * 60 * 60 * 1000);
+}
+
+function formatEvents(events: Awaited<ReturnType<typeof readCachedEvents>>): string {
+  if (events.length === 0) return 'No events found.';
+  return JSON.stringify(
+    events.map((e) => ({
+      timestamp: e.timestamp,
+      source: e.source,
+      kind: e.kind,
+      summary: e.summary,
+      tags: e.tags,
+    })),
+    null,
+    2,
+  );
+}
+
+export async function startMcpServer(config: UrchinConfig): Promise<void> {
+  const server = new Server(
+    { name: 'urchin', version: '1.0.0' },
+    { capabilities: { tools: {} } },
+  );
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: TOOL_DEFINITIONS,
+  }));
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    const params = (args ?? {}) as Record<string, unknown>;
+
+    if (name === 'urchin_recent_activity') {
+      const hours = typeof params.hours === 'number' ? params.hours : 24;
+      const limit = typeof params.limit === 'number' ? params.limit : 20;
+      const source = typeof params.source === 'string' && KNOWN_SOURCES.includes(params.source as EventSource)
+        ? (params.source as EventSource)
+        : undefined;
+
+      const events = await readCachedEvents(config.eventCachePath, {
+        since: hoursAgo(hours),
+        source,
+        limit,
+      });
+
+      return {
+        content: [{ type: 'text', text: formatEvents(events) }],
+      };
+    }
+
+    if (name === 'urchin_project_context') {
+      const project = typeof params.project === 'string' ? params.project.toLowerCase().trim() : '';
+      if (!project) {
+        return { content: [{ type: 'text', text: 'project parameter is required.' }], isError: true };
+      }
+      const hours = typeof params.hours === 'number' ? params.hours : 168;
+      const limit = typeof params.limit === 'number' ? params.limit : 30;
+
+      const all = await readCachedEvents(config.eventCachePath, { since: hoursAgo(hours) });
+      const matched = all.filter((e) => {
+        const inTags = e.tags.some((t) => t.toLowerCase().includes(project));
+        const inSummary = e.summary.toLowerCase().includes(project);
+        const inContent = e.content.toLowerCase().includes(project);
+        return inTags || inSummary || inContent;
+      }).slice(0, limit);
+
+      return {
+        content: [{ type: 'text', text: formatEvents(matched) }],
+      };
+    }
+
+    if (name === 'urchin_search') {
+      const query = typeof params.query === 'string' ? params.query.toLowerCase().trim() : '';
+      if (!query) {
+        return { content: [{ type: 'text', text: 'query parameter is required.' }], isError: true };
+      }
+      const hours = typeof params.hours === 'number' ? params.hours : 168;
+      const limit = typeof params.limit === 'number' ? params.limit : 20;
+
+      const all = await readCachedEvents(config.eventCachePath, { since: hoursAgo(hours) });
+      const matched = all.filter((e) =>
+        e.summary.toLowerCase().includes(query) || e.content.toLowerCase().includes(query),
+      ).slice(0, limit);
+
+      return {
+        content: [{ type: 'text', text: formatEvents(matched) }],
+      };
+    }
+
+    return { content: [{ type: 'text', text: `Unknown tool: ${name}` }], isError: true };
+  });
+
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
