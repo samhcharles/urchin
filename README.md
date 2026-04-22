@@ -30,37 +30,29 @@ See [`docs/architecture.md`](docs/architecture.md) for the core-plus-spikes mode
 - `urchin ingest-agent --agent codex --workspace urchin --status completed "message"` — append a generic local agent event into the dedicated agent bridge queue
 - `urchin ingest-vscode --workspace /repo --session chat-1 --file /repo/src/app.ts --role assistant "message"` — append a VS Code bridge event into the dedicated editor queue
 - `urchin mcp` — start the MCP server (stdio transport) for use with Claude Code and other MCP clients
+- `urchin serve` — start the HTTP intake server (auto-selects a free port, records it at `~/.local/state/urchin/intake.port`)
 - `urchin status` — show resolved config and sync state
 - `urchin doctor` — show blunt runtime diagnostics: what is shipped, what is reachable, what last ran, and what is still only planned
 
 ## MCP server
 
-`urchin mcp` exposes three tools over stdio:
+`urchin mcp` exposes five tools over stdio:
 
 | Tool | Description |
 |---|---|
-| `urchin_ingest` | Record an activity event into the VS Code bridge queue. Params: `content`, `workspace` (required); `session`, `title`, `file`, `role`, `kind` (optional). |
+| `urchin_status` | Current sync state: last sync time, event cache size, intake server health. **Call this at session start.** |
+| `urchin_ingest` | Record an activity event from any MCP-capable tool (Copilot, Gemini, Codex, Claude, Cursor, Continue.dev). Params: `content`, `workspace` (required); `source`, `session`, `title`, `file`, `kind`, `tags` (optional). |
 | `urchin_recent_activity` | Recent events across all sources. Params: `hours` (default 24), `source`, `limit` (default 20). |
 | `urchin_project_context` | Events matched to a project by name. Params: `project` (required), `hours` (default 168), `limit` (default 30). |
 | `urchin_search` | Full-text search over summary and content. Params: `query` (required), `hours` (default 168), `limit` (default 20). |
 
-The read tools (`urchin_recent_activity`, `urchin_project_context`, `urchin_search`) read from a rolling 30-day JSONL event cache (`~/.local/share/urchin/event-cache.jsonl`) written during each `urchin sync`. Run at least one sync before querying.
+The read tools read from a rolling 30-day JSONL event cache (`~/.local/share/urchin/event-cache.jsonl`) written during each `urchin sync`. Run at least one sync before querying.
 
-`urchin_ingest` writes directly to the VS Code bridge queue (`URCHIN_VSCODE_EVENTS_PATH`) — no sync needed, the write is immediate.
+`urchin_ingest` writes immediately to the intake queue — no sync needed.
 
-### VS Code auto-capture
+### Wiring urchin into your AI tools
 
-Urchin is registered in `~/.config/Code/User/mcp.json`. Claude in VS Code can call `urchin_ingest` at the end of a session to self-report what it worked on:
-
-```
-Use urchin_ingest to record this session before we finish.
-workspace: /home/samhc/dev/urchin
-content: Implemented the MCP server with urchin_ingest and wired it into VS Code.
-```
-
-The event lands in the VS Code queue and is picked up by the next `urchin sync`.
-
-**Wire into Claude Code** — add to `~/.claude/settings.json`:
+**Claude Code** — add to `~/.claude/settings.json`:
 
 ```json
 {
@@ -73,7 +65,48 @@ The event lands in the VS Code queue and is picked up by the next `urchin sync`.
 }
 ```
 
-After adding the entry, restart Claude Code. The three tools appear under `@urchin` in any session.
+**VS Code (Copilot, Continue.dev, any MCP client)** — add the same block to `~/.config/Code/User/mcp.json` under `"servers"`.
+
+**Global session instructions** — create `~/.claude/CLAUDE.md` (Claude Code) or `~/.gemini/GEMINI.md` (Gemini CLI) with:
+
+```markdown
+## Context sync
+Urchin is running. Call urchin_status at the start of this session.
+Call urchin_ingest at the end with a summary of what was worked on.
+```
+
+**Shell** — add to `~/.bashrc`:
+
+```bash
+urchin-log() {
+  local port=$(cat ~/.local/state/urchin/intake.port 2>/dev/null || echo 18799)
+  curl -s -X POST "http://127.0.0.1:$port/ingest" \
+    -H 'Content-Type: application/json' \
+    -d "{\"content\":$(printf '%s' "$*" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))'),\"source\":\"shell\"}"
+}
+```
+
+**Any other tool** — read the port file and POST to `/ingest`:
+
+```bash
+PORT=$(cat ~/.local/state/urchin/intake.port 2>/dev/null || echo 18799)
+curl -s -X POST "http://127.0.0.1:$PORT/ingest" \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"what was done","source":"gemini","kind":"conversation"}'
+```
+
+The intake server selects a free port automatically (starting at `URCHIN_INTAKE_PORT`, default 18799) and writes the live port to `~/.local/state/urchin/intake.port`. No hardcoded ports, no conflicts.
+
+**Always-on intake server** — install the systemd user service:
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp assets/urchin-intake.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now urchin-intake
+```
+
+After adding the MCP entry, restart your editor. The tools appear under `@urchin` in any Claude Code or Copilot session.
 
 If a collector fails during `urchin sync`, Urchin now refuses to advance the sync checkpoint. That keeps the next run from silently skipping activity.
 
@@ -92,6 +125,8 @@ Urchin defaults to the local paths used in this workflow, but every important pa
 | --- | --- |
 | `URCHIN_AGENT_EVENTS_PATH` | `~/.local/share/urchin/agents/events.jsonl` |
 | `URCHIN_EVENT_CACHE_PATH` | `~/.local/share/urchin/event-cache.jsonl` |
+| `URCHIN_INTAKE_PORT` | `18799` (auto-increments to find a free port) |
+| `URCHIN_INTAKE_PORT_FILE` | `~/.local/state/urchin/intake.port` |
 | `URCHIN_VAULT_ROOT` | `~/brain` |
 | `URCHIN_ARCHIVE_ROOT` | `~/brain/40-archive/urchin` |
 | `URCHIN_STATE_PATH` | `~/.local/state/urchin/state.json` |
