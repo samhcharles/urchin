@@ -6,6 +6,7 @@ import * as path from 'node:path';
 import { getPersonalAutomationState, resolvePersonalPaths } from '../bootstrap/personal';
 import { UrchinConfig } from './config';
 import { resolveNodeIdentity } from './identity';
+import { RemoteMirrorManifest } from '../replication/remote';
 import { loadState, SourceSyncState } from './state';
 import { EventSource } from '../types';
 
@@ -178,6 +179,38 @@ const SOURCE_SPECS: SourceSpec[] = [
     },
   },
   {
+    source: 'remote',
+    label: 'Remote journal mirror collector',
+    category: 'collector',
+    note: 'Reads mirrored remote node journals pulled into the local mirror root so VPS and other nodes land in the same sync pipeline.',
+    paths: (config) => [config.remoteMirrorRoot],
+    status: ([root]) => (root?.exists ? 'ready' : 'missing'),
+    details: async (config) => {
+      if (!(await fs.pathExists(config.remoteMirrorRoot))) {
+        return { mirroredNodes: 0, remoteHosts: '' };
+      }
+
+      const children = await fs.readdir(config.remoteMirrorRoot).catch(() => []);
+      const manifests: RemoteMirrorManifest[] = [];
+      for (const child of children) {
+        const manifestPath = path.join(config.remoteMirrorRoot, child, 'manifest.json');
+        if (!(await fs.pathExists(manifestPath))) {
+          continue;
+        }
+
+        const manifest = await fs.readJson(manifestPath).catch(() => null) as RemoteMirrorManifest | null;
+        if (manifest) {
+          manifests.push(manifest);
+        }
+      }
+
+      return {
+        mirroredNodes: manifests.length,
+        remoteHosts: manifests.map((manifest) => manifest.host).join(', '),
+      };
+    },
+  },
+  {
     source: 'shell',
     label: 'Shell history collector',
     category: 'collector',
@@ -245,6 +278,11 @@ const SPIKE_REPORTS: DoctorSpikeReport[] = [
     id: 'agent-bridge',
     status: 'shipped',
     note: 'A generic local agent bridge now lets Codex-style or custom agents land in the same sync pipeline without fake native support claims.',
+  },
+  {
+    id: 'remote-journal-bridge',
+    status: 'shipped',
+    note: 'Remote node journals can now be mirrored over SSH with `urchin pull-remote`, then read by the remote collector on the next sync.',
   },
   {
     id: 'editor-jetbrains',

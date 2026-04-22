@@ -19,6 +19,7 @@ export interface UrchinConfig {
   openclawCommandsLog: string;
   openclawCronRunsDir: string;
   projectAliasPath: string;
+  remoteMirrorRoot: string;
   reposRoots: string[];
   shellIgnorePrefixes: string[];
   shellMinCommandLength: number;
@@ -86,6 +87,7 @@ export function loadConfig(): UrchinConfig {
     openclawCommandsLog: expandHome(process.env.URCHIN_OPENCLAW_COMMANDS_LOG ?? '~/.openclaw/logs/commands.log'),
     openclawCronRunsDir: expandHome(process.env.URCHIN_OPENCLAW_CRON_RUNS_DIR ?? '~/.openclaw/cron/runs'),
     projectAliasPath: expandHome(process.env.URCHIN_PROJECT_ALIAS_PATH ?? '~/.config/urchin/project-aliases.json'),
+    remoteMirrorRoot: expandHome(process.env.URCHIN_REMOTE_MIRROR_ROOT ?? '~/.local/share/urchin/remotes'),
     reposRoots: splitPaths(process.env.URCHIN_REPOS_ROOTS, [expandHome('~/dev'), expandHome('~/repos')]),
     shellIgnorePrefixes: splitList(process.env.URCHIN_SHELL_IGNORE_PREFIXES, ['cd', 'ls', 'pwd', 'clear', 'history', 'exit']),
     shellMinCommandLength: Number(process.env.URCHIN_SHELL_MIN_COMMAND_LENGTH ?? '8'),

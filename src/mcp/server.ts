@@ -325,6 +325,7 @@ export async function startMcpServer(config: UrchinConfig): Promise<void> {
         intakeServerRunning,
         identity: identity.identity,
         identityFileExists: identity.exists,
+        remoteMirrorRoot: config.remoteMirrorRoot,
         vaultRoot: config.vaultRoot,
         eventCachePath: config.eventCachePath,
       };

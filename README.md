@@ -196,6 +196,7 @@ urchin init --mode starter --vault ~/brain     # scaffold new vault layout
 urchin setup-personal --enable true            # write systemd timer, env file, personal note
 urchin identity                                # print resolved node identity and its source
 urchin identity --write true --device vps-1    # persist actor/account/device identity for this node
+urchin pull-remote --name vps --host user@host # mirror a remote node journal over SSH into local sync
 urchin status                                  # print resolved config and last sync state
 urchin doctor                                  # runtime diagnostics — what works, what is missing
 ```
@@ -224,6 +225,7 @@ All paths are configurable via environment variables. Set them in `~/.config/urc
 | `URCHIN_VSCODE_EVENTS_PATH` | `~/.local/share/urchin/editors/vscode/events.jsonl` |
 | `URCHIN_OPENCLAW_COMMANDS_LOG` | `~/.openclaw/logs/commands.log` |
 | `URCHIN_OPENCLAW_CRON_RUNS_DIR` | `~/.openclaw/cron/runs` |
+| `URCHIN_REMOTE_MIRROR_ROOT` | `~/.local/share/urchin/remotes` |
 | `URCHIN_SHELL_HISTORY_FILE` | `~/.bash_history` |
 | `URCHIN_SHELL_IGNORE_PREFIXES` | `cd,ls,pwd,clear,history,exit` |
 | `URCHIN_SHELL_MIN_COMMAND_LENGTH` | `8` |
@@ -241,6 +243,21 @@ Identity fields in the canonical journal can still be overridden with `URCHIN_AC
 `URCHIN_ACCOUNT_ID`, `URCHIN_DEVICE_ID`, and `URCHIN_DEFAULT_VISIBILITY`. Env overrides win over
 the identity file. If neither exists, Urchin falls back to the local username, hostname, and
 `private` visibility.
+
+### Remote node mirror
+
+Use this when a VPS or second machine has its own Urchin journal and you want those events pulled
+into the same local sync pipeline.
+
+```bash
+urchin pull-remote --name vps --host user@2.24.29.238
+urchin sync
+```
+
+`pull-remote` mirrors the remote journal into `~/.local/share/urchin/remotes/<name>/events.jsonl`.
+The next `urchin sync` reads that mirror through the remote collector and lands those events in the
+same archive, project notes, cache, and MCP surfaces. This is a truthful bridge, not full automatic
+replication yet.
 
 ---
 
@@ -293,8 +310,9 @@ Tests live in `test/`. Every collector has a test fixture. Keep them passing —
 | Agent bridge | ✅ shipped | Generic JSONL queue + `urchin ingest-agent` |
 | Universal awareness docs | ✅ shipped | Wiring guide for every major tool type |
 | Durable node identity | ✅ shipped | Persist actor/account/device identity in `~/.config/urchin/identity.json` and surface it in status/doctor |
+| Remote journal pull bridge | ✅ shipped | Mirror a remote node journal over SSH into the local sync pipeline |
 | Replication foundation | 🔲 planned | Move journal continuity cleanly across WSL / Windows / VPS |
-| VPS / remote bridge | 🔲 planned | SSH-pull remote cron run JSONL on sync |
+| VPS / remote automation | 🔲 planned | Automatic timers or pull flows for remote nodes instead of manual bridge commands |
 | Browser intake | 🔲 planned | Extension or bookmarklet POSTing to intake |
 | Neovim plugin | 🔲 planned | Editor bridge for terminal-first workflows |
 | JetBrains plugin | 🔲 planned | Native editor bridge for JetBrains IDEs |

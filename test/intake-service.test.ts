@@ -27,6 +27,7 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
      eventJournalPath: path.join(root, '.local', 'share', 'urchin', 'journal', 'events.jsonl'),
      identityPath: path.join(root, '.config', 'urchin', 'identity.json'),
      projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
+     remoteMirrorRoot: path.join(root, '.local', 'share', 'urchin', 'remotes'),
     reposRoots: [path.join(root, 'dev')],
     shellIgnorePrefixes: ['cd', 'ls'],
     shellMinCommandLength: 8,
@@ -66,6 +67,7 @@ test('setupIntakeService writes a machine-specific env and service unit', async 
     assert.equal(result.written.length, 3);
     assert.match(env, /URCHIN_INTAKE_ROOT/);
     assert.match(env, /URCHIN_IDENTITY_PATH/);
+    assert.match(env, /URCHIN_REMOTE_MIRROR_ROOT/);
     assert.match(env, /URCHIN_VAULT_ROOT/);
     assert.match(service, /EnvironmentFile=.*personal\.env/);
     assert.match(service, /ExecStart="\/usr\/bin\/node" "\/tmp\/urchin\/dist\/src\/index\.js" serve/);

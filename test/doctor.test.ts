@@ -28,6 +28,7 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
      eventJournalPath: path.join(root, '.local', 'share', 'urchin', 'journal', 'events.jsonl'),
      identityPath: path.join(root, '.config', 'urchin', 'identity.json'),
      projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
+     remoteMirrorRoot: path.join(root, '.local', 'share', 'urchin', 'remotes'),
     reposRoots: [path.join(root, 'dev'), path.join(root, 'repos')],
     shellIgnorePrefixes: ['cd', 'ls'],
     shellMinCommandLength: 8,
@@ -81,12 +82,23 @@ test('buildDoctorReport distinguishes reachable shipped collectors from planned 
   await withTempConfig(async (config, root) => {
     await fs.ensureDir(path.join(root, '.config', 'urchin'));
     await fs.ensureDir(path.join(root, '.config', 'systemd', 'user'));
-     await fs.writeFile(path.join(root, '.config', 'urchin', 'personal.env'), 'URCHIN_VAULT_ROOT="/tmp/vault"\n', 'utf8');
+      await fs.writeFile(path.join(root, '.config', 'urchin', 'personal.env'), 'URCHIN_VAULT_ROOT="/tmp/vault"\n', 'utf8');
       await fs.writeJson(path.join(root, '.config', 'urchin', 'identity.json'), {
         accountId: 'samhc',
         actorId: 'sam-founder',
         deviceId: 'wsl-dev',
         visibility: 'private',
+      });
+      await fs.ensureDir(path.join(config.remoteMirrorRoot, 'vps'));
+      await fs.writeJson(path.join(config.remoteMirrorRoot, 'vps', 'manifest.json'), {
+        eventCount: 12,
+        host: 'user@2.24.29.238',
+        identityFetched: true,
+        identityMirrorPath: path.join(config.remoteMirrorRoot, 'vps', 'identity.json'),
+        journalMirrorPath: path.join(config.remoteMirrorRoot, 'vps', 'events.jsonl'),
+        journalRemotePath: '~/.local/share/urchin/journal/events.jsonl',
+        mirrorName: 'vps',
+        pulledAt: '2026-04-21T09:30:00.000Z',
       });
       await fs.writeFile(path.join(root, '.config', 'systemd', 'user', 'urchin.service'), '[Service]\n', 'utf8');
     await fs.writeFile(path.join(root, '.config', 'systemd', 'user', 'urchin.timer'), '[Timer]\n', 'utf8');
@@ -135,18 +147,27 @@ test('buildDoctorReport distinguishes reachable shipped collectors from planned 
     assert.equal(openclaw.status, 'ready');
     assert.equal(openclaw.details?.cronRunFiles, 1);
 
-    const git = report.sources.find((source) => source.source === 'git');
-    assert.ok(git);
-    assert.equal(git.details?.discoveredRepos, 1);
+      const git = report.sources.find((source) => source.source === 'git');
+      assert.ok(git);
+      assert.equal(git.details?.discoveredRepos, 1);
 
-    assert.equal(report.sync.shippedSourceCount, 9);
+      const remote = report.sources.find((source) => source.source === 'remote');
+      assert.ok(remote);
+      assert.equal(remote.status, 'ready');
+      assert.equal(remote.details?.mirroredNodes, 1);
+
+      assert.equal(report.sync.shippedSourceCount, 10);
 
     const vscodeSpike = report.spikes.find((spike) => spike.id === 'editor-vscode');
     assert.ok(vscodeSpike);
     assert.equal(vscodeSpike.status, 'shipped');
 
-    const agentSpike = report.spikes.find((spike) => spike.id === 'agent-bridge');
-    assert.ok(agentSpike);
-    assert.equal(agentSpike.status, 'shipped');
-  });
+      const agentSpike = report.spikes.find((spike) => spike.id === 'agent-bridge');
+      assert.ok(agentSpike);
+      assert.equal(agentSpike.status, 'shipped');
+
+      const remoteSpike = report.spikes.find((spike) => spike.id === 'remote-journal-bridge');
+      assert.ok(remoteSpike);
+      assert.equal(remoteSpike.status, 'shipped');
+    });
 });

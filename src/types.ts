@@ -7,6 +7,7 @@ export type EventSource =
   | 'git'
   | 'manual'
   | 'openclaw'
+  | 'remote'
   | 'shell'
   | 'vscode';
 

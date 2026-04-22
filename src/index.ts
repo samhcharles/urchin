@@ -14,6 +14,7 @@ import { CopilotCollector } from './collectors/copilot';
 import { GeminiCollector } from './collectors/gemini';
 import { IntakeCollector } from './collectors/intake';
 import { OpenClawCollector } from './collectors/openclaw';
+import { RemoteCollector } from './collectors/remote';
 import { GitCollector, ShellCollector } from './collectors/shell';
 import { VSCodeCollector } from './collectors/vscode';
 import { loadConfig } from './core/config';
@@ -24,6 +25,7 @@ import { startMcpServer } from './mcp/server';
 import { runSync } from './core/sync';
 import { loadState } from './core/state';
 import { appendManualCapture } from './obsidian/writer';
+import { pullRemoteJournal } from './replication/remote';
 import { Linker } from './synthesis/linker';
 import { Collector, EventKind, EventSource } from './types';
 
@@ -119,6 +121,11 @@ async function main() {
 
   if (command === 'identity') {
     await identity(config, args.slice(1));
+    return;
+  }
+
+  if (command === 'pull-remote') {
+    await pullRemote(config, args.slice(1));
     return;
   }
 
@@ -244,6 +251,7 @@ async function sync(config: ReturnType<typeof loadConfig>) {
     new GeminiCollector(config),
     new ClaudeCollector(config),
     new OpenClawCollector(config),
+    new RemoteCollector(config),
     new ShellCollector(config),
     new GitCollector(config),
     new VSCodeCollector(config),
@@ -306,6 +314,7 @@ async function status(config: ReturnType<typeof loadConfig>) {
         openclawCommandsLog: config.openclawCommandsLog,
         openclawCronRunsDir: config.openclawCronRunsDir,
         projectAliasPath: config.projectAliasPath,
+        remoteMirrorRoot: config.remoteMirrorRoot,
         reposRoots: config.reposRoots,
         shellHistoryFile: config.shellHistoryFile,
         statePath: config.statePath,
@@ -352,6 +361,31 @@ async function identity(config: ReturnType<typeof loadConfig>, args: string[]) {
     : await resolveNodeIdentity(config);
 
   console.log(JSON.stringify(report, null, 2));
+}
+
+async function pullRemote(config: ReturnType<typeof loadConfig>, args: string[]) {
+  const { flags } = parseFlags(args);
+  const name = flags.name?.trim();
+  const host = flags.host?.trim();
+
+  if (!name || !host) {
+    console.error(
+      'Usage: urchin pull-remote --name vps --host user@host [--journal ~/.local/share/urchin/journal/events.jsonl] [--identity ~/.config/urchin/identity.json]',
+    );
+    process.exit(1);
+  }
+
+  const result = await pullRemoteJournal({
+    config,
+    host,
+    identityPath: flags.identity,
+    journalPath: flags.journal,
+    name,
+  });
+
+  console.log(`Urchin: mirrored ${result.eventCount} remote event(s) from ${result.host} into ${result.journalMirrorPath}`);
+  console.log(`Urchin: identity fetched: ${result.identityFetched}`);
+  console.log(`Urchin: manifest written to ${result.manifestPath}`);
 }
 
 async function ingest(config: ReturnType<typeof loadConfig>, args: string[]) {

@@ -29,6 +29,7 @@ async function withTempVault(run: (config: UrchinConfig, linker: Linker) => Prom
     eventJournalPath: path.join(root, '.local', 'share', 'urchin', 'journal', 'events.jsonl'),
     identityPath: path.join(root, '.config', 'urchin', 'identity.json'),
     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
+    remoteMirrorRoot: path.join(root, '.local', 'share', 'urchin', 'remotes'),
     reposRoots: [path.join(root, 'dev')],
     shellIgnorePrefixes: ['cd', 'ls'],
     shellMinCommandLength: 8,

@@ -5,10 +5,10 @@ import * as path from 'node:path';
 import test from 'node:test';
 
 import { UrchinConfig } from '../src/core/config';
-import { ensureNodeIdentity, resolveNodeIdentity } from '../src/core/identity';
+import { pullRemoteJournal } from '../src/replication/remote';
 
 async function withTempConfig(run: (config: UrchinConfig, root: string) => Promise<void>) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'urchin-identity-'));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'urchin-remote-pull-'));
   const vaultRoot = path.join(root, 'vault');
   const config: UrchinConfig = {
     agentEventsPath: path.join(root, '.local', 'share', 'urchin', 'agents', 'events.jsonl'),
@@ -46,61 +46,60 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
   }
 }
 
-test('ensureNodeIdentity persists a durable node profile', async () => {
+test('pullRemoteJournal mirrors a remote journal and manifest into the local mirror root', async () => {
   await withTempConfig(async (config) => {
-    const resolved = await ensureNodeIdentity(
+    const result = await pullRemoteJournal({
       config,
-      {
-        accountId: 'SamHC',
-        actorId: 'Sam Founder',
-        deviceId: 'WSL Dev',
-        visibility: 'team',
+      host: 'user@host',
+      name: 'vps',
+      now: () => new Date('2026-04-22T22:45:00.000Z'),
+      runCommand: async (_file, args) => {
+        const command = args[1] ?? '';
+        if (command.includes('journal')) {
+          return {
+            stdout: '{"id":"evt-1","kind":"conversation","source":"claude","timestamp":"2026-04-22T21:00:00.000Z","summary":"remote","content":"continued work","tags":[],"metadata":{},"provenance":{"adapter":"claude-history","location":"/remote/history.jsonl","scope":"local"}}\n',
+          };
+        }
+
+        return {
+          stdout: '{"accountId":"samhc","actorId":"samhc","deviceId":"vps-1","visibility":"private"}\n',
+        };
       },
-      () => new Date('2026-04-22T22:00:00.000Z'),
-    );
+    });
 
-    assert.equal(resolved.exists, true);
-    assert.equal(resolved.identity.accountId, 'samhc');
-    assert.equal(resolved.identity.actorId, 'sam-founder');
-    assert.equal(resolved.identity.deviceId, 'wsl-dev');
-    assert.equal(resolved.identity.visibility, 'team');
+    assert.equal(result.eventCount, 1);
+    assert.equal(result.identityFetched, true);
 
-    const written = await fs.readJson(config.identityPath);
-    assert.equal(written.createdAt, '2026-04-22T22:00:00.000Z');
-    assert.equal(written.updatedAt, '2026-04-22T22:00:00.000Z');
+    const mirroredJournal = await fs.readFile(result.journalMirrorPath, 'utf8');
+    const manifest = await fs.readJson(result.manifestPath);
+    const mirroredIdentity = await fs.readJson(result.identityMirrorPath);
+
+    assert.match(mirroredJournal, /evt-1/);
+    assert.equal(manifest.mirrorName, 'vps');
+    assert.equal(manifest.host, 'user@host');
+    assert.equal(manifest.pulledAt, '2026-04-22T22:45:00.000Z');
+    assert.equal(mirroredIdentity.deviceId, 'vps-1');
   });
 });
 
-test('resolveNodeIdentity prefers env overrides over the persisted identity file', async () => {
-  const originalActor = process.env.URCHIN_ACTOR_ID;
-  const originalDevice = process.env.URCHIN_DEVICE_ID;
+test('pullRemoteJournal keeps working when remote identity is missing', async () => {
+  await withTempConfig(async (config) => {
+    const result = await pullRemoteJournal({
+      config,
+      host: 'user@host',
+      name: 'vps',
+      runCommand: async (_file, args) => {
+        const command = args[1] ?? '';
+        if (command.includes('journal')) {
+          return { stdout: '' };
+        }
 
-  process.env.URCHIN_ACTOR_ID = 'env-actor';
-  process.env.URCHIN_DEVICE_ID = 'env-device';
-
-  try {
-    await withTempConfig(async (config) => {
-      await fs.ensureDir(path.dirname(config.identityPath));
-      await fs.writeJson(config.identityPath, {
-        accountId: 'file-account',
-        actorId: 'file-actor',
-        deviceId: 'file-device',
-        visibility: 'private',
-      });
-
-      const resolved = await resolveNodeIdentity(config);
-      assert.equal(resolved.identity.accountId, 'file-account');
-      assert.equal(resolved.identity.actorId, 'env-actor');
-      assert.equal(resolved.identity.deviceId, 'env-device');
-      assert.equal(resolved.sources.accountId, 'file');
-      assert.equal(resolved.sources.actorId, 'env');
-      assert.equal(resolved.sources.deviceId, 'env');
+        throw new Error('remote identity missing');
+      },
     });
-  } finally {
-    if (originalActor === undefined) delete process.env.URCHIN_ACTOR_ID;
-    else process.env.URCHIN_ACTOR_ID = originalActor;
 
-    if (originalDevice === undefined) delete process.env.URCHIN_DEVICE_ID;
-    else process.env.URCHIN_DEVICE_ID = originalDevice;
-  }
+    assert.equal(result.identityFetched, false);
+    assert.equal(await fs.pathExists(result.identityMirrorPath), false);
+    assert.equal(await fs.pathExists(result.manifestPath), true);
+  });
 });

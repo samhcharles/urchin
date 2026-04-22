@@ -27,6 +27,7 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
      eventJournalPath: path.join(root, '.local', 'share', 'urchin', 'journal', 'events.jsonl'),
      identityPath: path.join(root, '.config', 'urchin', 'identity.json'),
      projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
+     remoteMirrorRoot: path.join(root, '.local', 'share', 'urchin', 'remotes'),
     reposRoots: [path.join(root, 'dev')],
     shellIgnorePrefixes: ['cd', 'ls'],
     shellMinCommandLength: 8,
@@ -71,12 +72,14 @@ test('setupPersonalWorkflow writes the personal env, systemd units, and workflow
     assert.match(env, /URCHIN_VAULT_ROOT/);
     assert.match(env, /URCHIN_AGENT_EVENTS_PATH/);
     assert.match(env, /URCHIN_IDENTITY_PATH/);
+    assert.match(env, /URCHIN_REMOTE_MIRROR_ROOT/);
     assert.match(env, /URCHIN_OPENCLAW_CRON_RUNS_DIR/);
     assert.match(service, /ExecStart="\/usr\/bin\/node" "\/tmp\/urchin\/dist\/src\/index\.js" sync/);
     assert.match(timer, /OnUnitActiveSec=5m/);
     assert.match(note, /Urchin Personal Workflow/);
     assert.match(note, /Agent bridge queue/);
     assert.match(note, /Node identity file/);
+    assert.match(note, /Remote mirror root/);
     assert.match(note, /OpenClaw cron runs/);
   });
 });
