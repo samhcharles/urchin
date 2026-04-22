@@ -39,11 +39,26 @@ See [`docs/architecture.md`](docs/architecture.md) for the core-plus-spikes mode
 
 | Tool | Description |
 |---|---|
+| `urchin_ingest` | Record an activity event into the VS Code bridge queue. Params: `content`, `workspace` (required); `session`, `title`, `file`, `role`, `kind` (optional). |
 | `urchin_recent_activity` | Recent events across all sources. Params: `hours` (default 24), `source`, `limit` (default 20). |
 | `urchin_project_context` | Events matched to a project by name. Params: `project` (required), `hours` (default 168), `limit` (default 30). |
 | `urchin_search` | Full-text search over summary and content. Params: `query` (required), `hours` (default 168), `limit` (default 20). |
 
-The server reads from a rolling 30-day JSONL event cache (`~/.local/share/urchin/event-cache.jsonl`) written during each `urchin sync`. Run at least one sync before querying.
+The read tools (`urchin_recent_activity`, `urchin_project_context`, `urchin_search`) read from a rolling 30-day JSONL event cache (`~/.local/share/urchin/event-cache.jsonl`) written during each `urchin sync`. Run at least one sync before querying.
+
+`urchin_ingest` writes directly to the VS Code bridge queue (`URCHIN_VSCODE_EVENTS_PATH`) — no sync needed, the write is immediate.
+
+### VS Code auto-capture
+
+Urchin is registered in `~/.config/Code/User/mcp.json`. Claude in VS Code can call `urchin_ingest` at the end of a session to self-report what it worked on:
+
+```
+Use urchin_ingest to record this session before we finish.
+workspace: /home/samhc/dev/urchin
+content: Implemented the MCP server with urchin_ingest and wired it into VS Code.
+```
+
+The event lands in the VS Code queue and is picked up by the next `urchin sync`.
 
 **Wire into Claude Code** — add to `~/.claude/settings.json`:
 

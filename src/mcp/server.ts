@@ -1,3 +1,6 @@
+import { randomUUID } from 'node:crypto';
+import * as fs from 'fs-extra';
+import * as path from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -10,6 +13,45 @@ const KNOWN_SOURCES: EventSource[] = [
 ];
 
 const TOOL_DEFINITIONS = [
+  {
+    name: 'urchin_ingest',
+    description:
+      'Record an activity event into Urchin. Call this at the end of a VS Code session (or any editor session) to capture what was done. The event lands in the VS Code bridge queue and is picked up by the next urchin sync.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        content: {
+          type: 'string',
+          description: 'What was done — a short description or the assistant message summarising the session',
+        },
+        workspace: {
+          type: 'string',
+          description: 'Absolute path to the workspace or repo (e.g. /home/samhc/dev/urchin)',
+        },
+        session: {
+          type: 'string',
+          description: 'Session identifier (optional — derived from workspace + date if omitted)',
+        },
+        title: {
+          type: 'string',
+          description: 'Chat or task title (optional)',
+        },
+        file: {
+          type: 'string',
+          description: 'Primary file being edited (optional)',
+        },
+        role: {
+          type: 'string',
+          description: 'Role of the message author: "user" or "assistant" (optional)',
+        },
+        kind: {
+          type: 'string',
+          description: 'Event kind: "conversation" (default) or "agent"',
+        },
+      },
+      required: ['content', 'workspace'],
+    },
+  },
   {
     name: 'urchin_recent_activity',
     description:
@@ -112,6 +154,42 @@ export async function startMcpServer(config: UrchinConfig): Promise<void> {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     const params = (args ?? {}) as Record<string, unknown>;
+
+    if (name === 'urchin_ingest') {
+      const content = typeof params.content === 'string' ? params.content.trim() : '';
+      const workspace = typeof params.workspace === 'string' ? params.workspace.trim() : '';
+      if (!content || !workspace) {
+        return { content: [{ type: 'text', text: 'content and workspace are required.' }], isError: true };
+      }
+
+      const workspaceBase = path.basename(workspace);
+      const today = new Date().toISOString().slice(0, 10);
+      const sessionId = typeof params.session === 'string' && params.session.trim()
+        ? params.session.trim()
+        : `${workspaceBase.replace(/[^a-zA-Z0-9._-]+/g, '-').toLowerCase()}-${today}`;
+
+      const event = {
+        id: randomUUID(),
+        content,
+        filePath: typeof params.file === 'string' && params.file.trim() ? params.file.trim() : undefined,
+        kind: params.kind === 'agent' ? 'agent' : 'conversation',
+        role: typeof params.role === 'string' && params.role.trim() ? params.role.trim() : undefined,
+        sessionId,
+        summary: typeof params.title === 'string' && params.title.trim()
+          ? `VS Code — ${params.title.trim()}`
+          : content.slice(0, 140),
+        timestamp: new Date().toISOString(),
+        title: typeof params.title === 'string' && params.title.trim() ? params.title.trim() : undefined,
+        workspacePath: workspace,
+      };
+
+      await fs.ensureDir(path.dirname(config.vscodeEventsPath));
+      await fs.appendFile(config.vscodeEventsPath, `${JSON.stringify(event)}\n`, 'utf8');
+
+      return {
+        content: [{ type: 'text', text: `Recorded to Urchin: ${event.summary.slice(0, 80)}` }],
+      };
+    }
 
     if (name === 'urchin_recent_activity') {
       const hours = typeof params.hours === 'number' ? params.hours : 24;

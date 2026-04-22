@@ -219,7 +219,7 @@ const SPIKE_REPORTS: DoctorSpikeReport[] = [
   {
     id: 'editor-vscode',
     status: 'shipped',
-    note: 'VS Code / VSCodium now has a shipped local bridge contract through the dedicated queue file and collector.',
+    note: 'VS Code bridge is fully wired: VSCodeCollector reads the queue, urchin_ingest MCP tool lets Claude in VS Code self-report sessions without manual CLI calls. Urchin is registered in VS Code mcp.json.',
   },
   {
     id: 'agent-bridge',
