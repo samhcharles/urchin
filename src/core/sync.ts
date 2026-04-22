@@ -4,6 +4,7 @@ import { Linker } from '../synthesis/linker';
 import { Collector, UrchinEvent } from '../types';
 import { UrchinConfig } from './config';
 import { dedupeEvents } from './dedupe';
+import { resolveNodeIdentity } from './identity';
 import { appendEventJournal, toCanonicalEvent } from './journal';
 import { sanitize } from './redaction';
 import { loadState, saveState } from './state';
@@ -142,7 +143,8 @@ export async function runSync(config: UrchinConfig, options: RunSyncOptions): Pr
 
   allEvents.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   const uniqueEvents = dedupeEvents(allEvents);
-  const canonicalEvents = uniqueEvents.map((event) => toCanonicalEvent(event));
+  const nodeIdentity = await resolveNodeIdentity(config);
+  const canonicalEvents = uniqueEvents.map((event) => toCanonicalEvent(event, nodeIdentity.identity));
   const sanitizedEvents = canonicalEvents.map((event) => ({
     ...event,
     summary: sanitize(event.summary, 240),

@@ -8,6 +8,7 @@ export interface UrchinConfig {
   claudeHistoryFile: string;
   eventCachePath: string;
   eventJournalPath: string;
+  identityPath: string;
   copilotSessionRoot: string;
   geminiTmpRoot: string;
   gitAuthor?: string;
@@ -71,6 +72,7 @@ export function loadConfig(): UrchinConfig {
     agentEventsPath: expandHome(process.env.URCHIN_AGENT_EVENTS_PATH ?? '~/.local/share/urchin/agents/events.jsonl'),
     eventCachePath: expandHome(process.env.URCHIN_EVENT_CACHE_PATH ?? '~/.local/share/urchin/event-cache.jsonl'),
     eventJournalPath: expandHome(process.env.URCHIN_EVENT_JOURNAL_PATH ?? '~/.local/share/urchin/journal/events.jsonl'),
+    identityPath: expandHome(process.env.URCHIN_IDENTITY_PATH ?? '~/.config/urchin/identity.json'),
     archiveIndexPath: path.join(archiveRoot, 'index.md'),
     archiveRoot,
     claudeHistoryFile: expandHome(process.env.URCHIN_CLAUDE_HISTORY_FILE ?? '~/.claude/history.jsonl'),

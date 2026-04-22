@@ -22,11 +22,12 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
     intakeRoot: path.join(root, 'intake'),
     intakePort: 18799,
     intakePortFile: path.join(root, 'intake.port'),
-    openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
-    openclawCronRunsDir: path.join(root, '.openclaw', 'cron', 'runs'),
-    eventCachePath: path.join(root, '.local', 'share', 'urchin', 'event-cache.jsonl'),
-    eventJournalPath: path.join(root, '.local', 'share', 'urchin', 'journal', 'events.jsonl'),
-    projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
+     openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
+     openclawCronRunsDir: path.join(root, '.openclaw', 'cron', 'runs'),
+     eventCachePath: path.join(root, '.local', 'share', 'urchin', 'event-cache.jsonl'),
+     eventJournalPath: path.join(root, '.local', 'share', 'urchin', 'journal', 'events.jsonl'),
+     identityPath: path.join(root, '.config', 'urchin', 'identity.json'),
+     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     reposRoots: [path.join(root, 'dev'), path.join(root, 'repos')],
     shellIgnorePrefixes: ['cd', 'ls'],
     shellMinCommandLength: 8,
@@ -80,8 +81,14 @@ test('buildDoctorReport distinguishes reachable shipped collectors from planned 
   await withTempConfig(async (config, root) => {
     await fs.ensureDir(path.join(root, '.config', 'urchin'));
     await fs.ensureDir(path.join(root, '.config', 'systemd', 'user'));
-    await fs.writeFile(path.join(root, '.config', 'urchin', 'personal.env'), 'URCHIN_VAULT_ROOT="/tmp/vault"\n', 'utf8');
-    await fs.writeFile(path.join(root, '.config', 'systemd', 'user', 'urchin.service'), '[Service]\n', 'utf8');
+     await fs.writeFile(path.join(root, '.config', 'urchin', 'personal.env'), 'URCHIN_VAULT_ROOT="/tmp/vault"\n', 'utf8');
+      await fs.writeJson(path.join(root, '.config', 'urchin', 'identity.json'), {
+        accountId: 'samhc',
+        actorId: 'sam-founder',
+        deviceId: 'wsl-dev',
+        visibility: 'private',
+      });
+      await fs.writeFile(path.join(root, '.config', 'systemd', 'user', 'urchin.service'), '[Service]\n', 'utf8');
     await fs.writeFile(path.join(root, '.config', 'systemd', 'user', 'urchin.timer'), '[Timer]\n', 'utf8');
     await fs.ensureDir(path.join(config.vaultRoot, '30-resources', 'ai'));
     await fs.writeFile(path.join(config.vaultRoot, '30-resources', 'ai', 'urchin-personal.md'), '# Personal\n', 'utf8');
@@ -106,9 +113,12 @@ test('buildDoctorReport distinguishes reachable shipped collectors from planned 
     assert.equal(report.sync.connectedSourceCount >= 1, true);
     assert.equal(report.sync.lastSyncWrittenCount, 6);
     assert.equal(report.automation.envExists, true);
-    assert.equal(report.automation.serviceInstalled, true);
-    assert.equal(report.automation.timerInstalled, true);
-    assert.equal(report.automation.personalNoteExists, true);
+     assert.equal(report.automation.serviceInstalled, true);
+     assert.equal(report.automation.timerInstalled, true);
+     assert.equal(report.automation.personalNoteExists, true);
+      assert.equal(report.identity.exists, true);
+      assert.equal(report.identity.actorId, 'sam-founder');
+      assert.equal(report.identity.deviceId, 'wsl-dev');
 
     const copilot = report.sources.find((source) => source.source === 'copilot');
     assert.ok(copilot);

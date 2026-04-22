@@ -194,6 +194,8 @@ urchin init --mode existing                    # wire into existing vault
 urchin setup-intake --enable true              # write and enable machine-specific intake service
 urchin init --mode starter --vault ~/brain     # scaffold new vault layout
 urchin setup-personal --enable true            # write systemd timer, env file, personal note
+urchin identity                                # print resolved node identity and its source
+urchin identity --write true --device vps-1    # persist actor/account/device identity for this node
 urchin status                                  # print resolved config and last sync state
 urchin doctor                                  # runtime diagnostics — what works, what is missing
 ```
@@ -214,6 +216,7 @@ All paths are configurable via environment variables. Set them in `~/.config/urc
 | `URCHIN_INTAKE_ROOT` | `~/.local/share/urchin/intake` |
 | `URCHIN_EVENT_CACHE_PATH` | `~/.local/share/urchin/event-cache.jsonl` |
 | `URCHIN_EVENT_JOURNAL_PATH` | `~/.local/share/urchin/journal/events.jsonl` |
+| `URCHIN_IDENTITY_PATH` | `~/.config/urchin/identity.json` |
 | `URCHIN_AGENT_EVENTS_PATH` | `~/.local/share/urchin/agents/events.jsonl` |
 | `URCHIN_CLAUDE_HISTORY_FILE` | `~/.claude/history.jsonl` |
 | `URCHIN_COPILOT_SESSION_ROOT` | `~/.copilot/session-state` |
@@ -231,9 +234,13 @@ All paths are configurable via environment variables. Set them in `~/.config/urc
 | `URCHIN_VSCODE_WORKSPACE_ALIASES_PATH` | `~/.config/urchin/vscode-workspaces.json` |
 | `URCHIN_INBOX_CAPTURE_PATH` | `~/brain/00-inbox/urchin-capture.md` |
 
-Identity fields in the canonical journal can be overridden with `URCHIN_ACTOR_ID`,
-`URCHIN_ACCOUNT_ID`, `URCHIN_DEVICE_ID`, and `URCHIN_DEFAULT_VISIBILITY`. If unset, Urchin falls
-back to the local username, hostname, and `private` visibility.
+Urchin now persists node identity at `~/.config/urchin/identity.json` so WSL, VPS, and other nodes
+can carry durable actor/account/device identity instead of depending only on transient env vars.
+
+Identity fields in the canonical journal can still be overridden with `URCHIN_ACTOR_ID`,
+`URCHIN_ACCOUNT_ID`, `URCHIN_DEVICE_ID`, and `URCHIN_DEFAULT_VISIBILITY`. Env overrides win over
+the identity file. If neither exists, Urchin falls back to the local username, hostname, and
+`private` visibility.
 
 ---
 
@@ -285,7 +292,7 @@ Tests live in `test/`. Every collector has a test fixture. Keep them passing —
 | VS Code bridge | ✅ shipped | `urchin_ingest` MCP tool + VSCode collector |
 | Agent bridge | ✅ shipped | Generic JSONL queue + `urchin ingest-agent` |
 | Universal awareness docs | ✅ shipped | Wiring guide for every major tool type |
-| Durable node identity | 🔲 planned | Persist actor/account/device identity outside transient env vars |
+| Durable node identity | ✅ shipped | Persist actor/account/device identity in `~/.config/urchin/identity.json` and surface it in status/doctor |
 | Replication foundation | 🔲 planned | Move journal continuity cleanly across WSL / Windows / VPS |
 | VPS / remote bridge | 🔲 planned | SSH-pull remote cron run JSONL on sync |
 | Browser intake | 🔲 planned | Extension or bookmarklet POSTing to intake |

@@ -18,6 +18,7 @@ import { GitCollector, ShellCollector } from './collectors/shell';
 import { VSCodeCollector } from './collectors/vscode';
 import { loadConfig } from './core/config';
 import { buildDoctorReport } from './core/doctor';
+import { ensureNodeIdentity, NodeIdentityProfile, resolveNodeIdentity } from './core/identity';
 import { startIntakeServer } from './intake/server';
 import { startMcpServer } from './mcp/server';
 import { runSync } from './core/sync';
@@ -113,6 +114,11 @@ async function main() {
 
   if (command === 'doctor') {
     await doctor(config);
+    return;
+  }
+
+  if (command === 'identity') {
+    await identity(config, args.slice(1));
     return;
   }
 
@@ -280,6 +286,7 @@ async function sync(config: ReturnType<typeof loadConfig>) {
 
 async function status(config: ReturnType<typeof loadConfig>) {
   const state = await loadState(config.statePath);
+  const identity = await resolveNodeIdentity(config);
   console.log(
     JSON.stringify(
       {
@@ -288,6 +295,10 @@ async function status(config: ReturnType<typeof loadConfig>) {
         claudeHistoryFile: config.claudeHistoryFile,
         copilotSessionRoot: config.copilotSessionRoot,
         eventJournalPath: config.eventJournalPath,
+        identity: identity.identity,
+        identityFileExists: identity.exists,
+        identityPath: identity.path,
+        identitySources: identity.sources,
         geminiTmpRoot: config.geminiTmpRoot,
         inboxCapturePath: config.inboxCapturePath,
         intakeRoot: config.intakeRoot,
@@ -309,6 +320,37 @@ async function status(config: ReturnType<typeof loadConfig>) {
 
 async function doctor(config: ReturnType<typeof loadConfig>) {
   const report = await buildDoctorReport(config);
+  console.log(JSON.stringify(report, null, 2));
+}
+
+function parseVisibilityFlag(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  if (value === 'private' || value === 'team' || value === 'public') {
+    return value;
+  }
+
+  console.error('Usage: urchin identity [--write true] [--actor id] [--account id] [--device id] [--visibility private|team|public]');
+  process.exit(1);
+}
+
+async function identity(config: ReturnType<typeof loadConfig>, args: string[]) {
+  const { flags } = parseFlags(args);
+  const shouldWrite = flags.write === 'true'
+    || Boolean(flags.actor || flags.account || flags.device || flags.visibility);
+  const visibility = parseVisibilityFlag(flags.visibility);
+  const overrides: Partial<NodeIdentityProfile> = {
+    ...(flags.account ? { accountId: flags.account } : {}),
+    ...(flags.actor ? { actorId: flags.actor } : {}),
+    ...(flags.device ? { deviceId: flags.device } : {}),
+    ...(visibility ? { visibility } : {}),
+  };
+  const report = shouldWrite
+    ? await ensureNodeIdentity(config, overrides)
+    : await resolveNodeIdentity(config);
+
   console.log(JSON.stringify(report, null, 2));
 }
 

@@ -5,6 +5,7 @@ import * as path from 'node:path';
 
 import { getPersonalAutomationState, resolvePersonalPaths } from '../bootstrap/personal';
 import { UrchinConfig } from './config';
+import { resolveNodeIdentity } from './identity';
 import { loadState, SourceSyncState } from './state';
 import { EventSource } from '../types';
 
@@ -46,6 +47,20 @@ export interface DoctorReport {
     timerInstalled: boolean;
   };
   generatedAt: string;
+  identity: {
+    accountId: string;
+    actorId: string;
+    deviceId: string;
+    exists: boolean;
+    path: string;
+    sources: {
+      accountId: 'env' | 'file' | 'fallback';
+      actorId: 'env' | 'file' | 'fallback';
+      deviceId: 'env' | 'file' | 'fallback';
+      visibility: 'env' | 'file' | 'fallback';
+    };
+    visibility: 'private' | 'team' | 'public';
+  };
   overallStatus: 'ok' | 'warning';
   vault: {
     root: string;
@@ -290,6 +305,7 @@ export async function buildDoctorReport(
   const stateFileExists = await fs.pathExists(config.statePath);
   const personalPaths = resolvePersonalPaths(config, homeRoot);
   const personalState = await getPersonalAutomationState(homeRoot);
+  const identity = await resolveNodeIdentity(config);
   const [
     envExists,
     personalNoteExists,
@@ -323,7 +339,7 @@ export async function buildDoctorReport(
   const hasRuntimeFailures = sources.some((source) => Boolean(source.runtime?.lastError));
   const writable = await canWrite(config.archiveRoot);
   const overallStatus: DoctorReport['overallStatus'] =
-    writable && connectedSourceCount > 0 && !hasRuntimeFailures ? 'ok' : 'warning';
+    writable && connectedSourceCount > 0 && !hasRuntimeFailures && identity.exists ? 'ok' : 'warning';
 
   return {
     automation: {
@@ -340,6 +356,15 @@ export async function buildDoctorReport(
       timerPath: personalPaths.timerPath,
     },
     generatedAt: now().toISOString(),
+    identity: {
+      accountId: identity.identity.accountId,
+      actorId: identity.identity.actorId,
+      deviceId: identity.identity.deviceId,
+      exists: identity.exists,
+      path: identity.path,
+      sources: identity.sources,
+      visibility: identity.identity.visibility,
+    },
     overallStatus,
     vault: {
       root: config.vaultRoot,

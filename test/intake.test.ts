@@ -24,6 +24,7 @@ async function withTempConfig(run: (config: UrchinConfig) => Promise<void>) {
     openclawCronRunsDir: path.join(root, '.openclaw', 'cron', 'runs'),
     eventCachePath: path.join(root, '.local', 'share', 'urchin', 'event-cache.jsonl'),
     eventJournalPath: path.join(root, '.local', 'share', 'urchin', 'journal', 'events.jsonl'),
+    identityPath: path.join(root, '.config', 'urchin', 'identity.json'),
     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     reposRoots: [path.join(root, 'dev')],
     shellIgnorePrefixes: ['cd', 'ls'],

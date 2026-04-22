@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import * as fs from 'fs-extra';
 
 import { UrchinConfig } from '../core/config';
+import { ensureNodeIdentity } from '../core/identity';
 import { writeFileAtomic } from '../core/io';
 import { buildEnvFile, resolvePersonalPaths } from './personal';
 
@@ -131,6 +132,14 @@ export async function setupIntakeService(options: IntakeServiceSetupOptions): Pr
 
   await writeTrackedFile(personalPaths.envPath, buildEnvFile(options.config), created, updated, written);
   await writeTrackedFile(servicePath, buildIntakeServiceFile(personalPaths.envPath, nodePath, scriptPath), created, updated, written);
+  const identityExisted = await fs.pathExists(options.config.identityPath);
+  const identity = await ensureNodeIdentity(options.config);
+  written.push(identity.path);
+  if (identityExisted) {
+    updated.push(identity.path);
+  } else {
+    created.push(identity.path);
+  }
 
   let state = await getIntakeServiceAutomationState();
   if (options.enableSystemd && state.systemdAvailable) {

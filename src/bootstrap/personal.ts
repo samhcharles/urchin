@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import * as fs from 'fs-extra';
 
 import { UrchinConfig } from '../core/config';
+import { ensureNodeIdentity, ResolvedNodeIdentity } from '../core/identity';
 import { writeFileAtomic } from '../core/io';
 
 const execFileAsync = promisify(execFile);
@@ -74,6 +75,7 @@ export function buildEnvFile(config: UrchinConfig): string {
     envLine('URCHIN_ARCHIVE_ROOT', config.archiveRoot),
     envLine('URCHIN_STATE_PATH', config.statePath),
     envLine('URCHIN_EVENT_JOURNAL_PATH', config.eventJournalPath),
+    envLine('URCHIN_IDENTITY_PATH', config.identityPath),
     envLine('URCHIN_INBOX_CAPTURE_PATH', config.inboxCapturePath),
     envLine('URCHIN_INTAKE_ROOT', config.intakeRoot),
     envLine('URCHIN_COPILOT_SESSION_ROOT', config.copilotSessionRoot),
@@ -123,7 +125,7 @@ function buildTimerFile(cadence: string): string {
   ].join('\n') + '\n';
 }
 
-function buildPersonalNote(config: UrchinConfig, state: PersonalAutomationState): string {
+function buildPersonalNote(config: UrchinConfig, state: PersonalAutomationState, identity: ResolvedNodeIdentity): string {
   return [
     '# Urchin Personal Workflow',
     '',
@@ -133,6 +135,10 @@ function buildPersonalNote(config: UrchinConfig, state: PersonalAutomationState)
     `- Vault: \`${config.vaultRoot}\``,
     `- Archive: \`${config.archiveRoot}\``,
     `- Agent bridge queue: \`${config.agentEventsPath}\``,
+    `- Node identity file: \`${identity.path}\``,
+    `- Identity file exists: \`${identity.exists}\``,
+    `- Actor / account / device: \`${identity.identity.actorId}\` / \`${identity.identity.accountId}\` / \`${identity.identity.deviceId}\``,
+    `- Default visibility: \`${identity.identity.visibility}\``,
     `- VS Code bridge queue: \`${config.vscodeEventsPath}\``,
     `- VS Code workspace aliases: \`${config.vscodeWorkspaceAliasesPath}\``,
     `- Timer cadence: \`${config.timerCadence}\``,
@@ -225,6 +231,14 @@ export async function setupPersonalWorkflow(options: PersonalSetupOptions): Prom
   await writeTrackedFile(paths.envPath, buildEnvFile(options.config), created, updated, written);
   await writeTrackedFile(paths.servicePath, buildServiceFile(paths, nodePath, scriptPath), created, updated, written);
   await writeTrackedFile(paths.timerPath, buildTimerFile(options.timerCadence ?? options.config.timerCadence), created, updated, written);
+  const identityExisted = await fs.pathExists(options.config.identityPath);
+  const identity = await ensureNodeIdentity(options.config);
+  written.push(identity.path);
+  if (identityExisted) {
+    updated.push(identity.path);
+  } else {
+    created.push(identity.path);
+  }
 
   let state = await getPersonalAutomationState(options.homeRoot);
   if (options.enableSystemd && state.systemdAvailable) {
@@ -233,7 +247,7 @@ export async function setupPersonalWorkflow(options: PersonalSetupOptions): Prom
     state = await getPersonalAutomationState(options.homeRoot);
   }
 
-  await writeTrackedFile(paths.notePath, buildPersonalNote(options.config, state), created, updated, written);
+  await writeTrackedFile(paths.notePath, buildPersonalNote(options.config, state, identity), created, updated, written);
 
   return {
     created,

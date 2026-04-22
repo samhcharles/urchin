@@ -5,6 +5,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { UrchinConfig } from '../core/config';
+import { resolveNodeIdentity } from '../core/identity';
 import { loadState } from '../core/state';
 import { EventSource } from '../types';
 import { readCachedEvents } from './reader';
@@ -314,6 +315,7 @@ export async function startMcpServer(config: UrchinConfig): Promise<void> {
         }
       }
 
+      const identity = await resolveNodeIdentity(config);
       const statusPayload = {
         running: true,
         lastSyncAt,
@@ -321,6 +323,8 @@ export async function startMcpServer(config: UrchinConfig): Promise<void> {
         eventCacheSize,
         intakeServerPort,
         intakeServerRunning,
+        identity: identity.identity,
+        identityFileExists: identity.exists,
         vaultRoot: config.vaultRoot,
         eventCachePath: config.eventCachePath,
       };
