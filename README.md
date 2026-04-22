@@ -24,6 +24,17 @@ This is not a note-taking app or a memory layer bolted onto one tool. It is infr
 
 ---
 
+## Orinadus planning docs
+
+For public-facing positioning and launch copy built on top of Urchin, see:
+
+- `docs/orinadus/homepage-messaging.md`
+- `docs/orinadus/available-now-vs-next.md`
+- `docs/orinadus/waitlist-intake.md`
+- `docs/orinadus/site/` (simple static website starter)
+
+---
+
 ## What it captures
 
 | Source | How |
@@ -274,11 +285,14 @@ Tests live in `test/`. Every collector has a test fixture. Keep them passing —
 | VS Code bridge | ✅ shipped | `urchin_ingest` MCP tool + VSCode collector |
 | Agent bridge | ✅ shipped | Generic JSONL queue + `urchin ingest-agent` |
 | Universal awareness docs | ✅ shipped | Wiring guide for every major tool type |
+| Durable node identity | 🔲 planned | Persist actor/account/device identity outside transient env vars |
+| Replication foundation | 🔲 planned | Move journal continuity cleanly across WSL / Windows / VPS |
 | VPS / remote bridge | 🔲 planned | SSH-pull remote cron run JSONL on sync |
 | Browser intake | 🔲 planned | Extension or bookmarklet POSTing to intake |
 | Neovim plugin | 🔲 planned | Editor bridge for terminal-first workflows |
 | JetBrains plugin | 🔲 planned | Native editor bridge for JetBrains IDEs |
 | Orinadus starter vault | 🔲 planned | Opinionated vault scaffold with Urchin pre-wired |
+| Second brain hatch flow | 🔲 planned | Guided local-first onboarding for users who do not already have a brain |
 
 ---
 
@@ -293,5 +307,7 @@ The short version: the core (`sync`, `dedupe`, `redact`, `state`, `config`) owns
 ## Part of Orinadus
 
 Urchin is the first technology from [Orinadus](https://orinadus.com) — infrastructure for AI-heavy development workflows. The goal is simple: as the number of AI tools compounds, the memory fragmentation problem compounds with it. Urchin is the substrate that absorbs that fragmentation.
+
+If a user already has a brain, Urchin should plug into it. If they do not, the planned Orinadus onboarding path is to hatch one cleanly without changing the substrate underneath.
 
 If you work across multiple AI tools and the context never carries, this is built for you.
