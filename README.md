@@ -1,58 +1,74 @@
 # Urchin
 
-Urchin is a local-first context bridge that pulls scattered AI and workflow activity into an Obsidian brain without turning the vault into a dumping ground.
+**Context substrate for AI-heavy workflows.**
 
-## Current direction
+You use Claude, Copilot, Gemini, Codex, VS Code, the shell. Each one starts fresh. Each one has its own history, its own memory, its own idea of what you worked on. There is no shared substrate — so you repeat yourself, lose context between tools, and nothing ever feels connected.
 
-- **Core first:** config, provenance, redaction, checkpoints, deterministic vault writes
-- **Spikes later:** source adapters, intake adapters, enrichers, output writers
-- **Vault-aware:** archive layers live in the vault, but promotion into durable notes stays explicit
+Urchin fixes that. It collects activity from every tool you use, archives it into an Obsidian vault, and exposes it back as queryable context through an MCP server and an HTTP intake endpoint. One sync cadence. One archive. Every tool connected.
 
-## Current outputs
+```
+Claude ──┐
+Copilot ─┤                     ┌─ MCP tools (urchin_status, urchin_recent_activity...)
+Gemini ──┤                     │   └── Claude Code, VS Code, Cursor, Continue.dev
+Codex ───┼──► Urchin core ────►├─ Obsidian vault archive (daily/ projects/ triage/)
+shell ───┤    (sync, dedupe,   │   └── readable by any agent, any session
+git ─────┤     redact, write)  └─ HTTP /ingest endpoint
+VS Code ─┤                         └── Gemini, aider, scripts, browsers, VPS agents
+OpenClaw-┘
+```
 
-- `40-archive/urchin/daily/` — day timelines across all synced sources
-- `40-archive/urchin/projects/` — project-scoped activity notes when Urchin can infer repo or project context
-- `40-archive/urchin/triage/` — low-confidence capture review notes
-- `40-archive/urchin/index.md` — top-level archive index
-- Copilot background task/agent launches and terminal results now land as first-class archive events when they are present in session-state logs
-- selected high-signal events can now update project notes, the Urchin resource note, and explicit decision ledgers through managed provenance-backed sections
+This is not a note-taking app or a memory layer bolted onto one tool. It is infrastructure — like git, but for context.
 
-See [`docs/architecture.md`](docs/architecture.md) for the core-plus-spikes model and intake contract.
+---
 
-## Commands
+## What it captures
 
-- `urchin init --mode existing` — wire Urchin into an existing vault without destructive scaffolding
-- `urchin init --mode starter --vault /path/to/vault` — scaffold a starter vault layout for Urchin
-- `urchin setup-personal --mode existing --enable true` — write a personal env file, systemd timer, and personal-use note for the real daily workflow
-- `urchin` or `urchin sync` — collect recent activity and write timeline notes
-- `urchin dump "text"` — append a manual capture into the Obsidian inbox
-- `urchin ingest --source browser --kind capture --scope network "captured text"` — append an external/browser-style event into the bounded intake queue
-- `urchin ingest-agent --agent codex --workspace urchin --status completed "message"` — append a generic local agent event into the dedicated agent bridge queue
-- `urchin ingest-vscode --workspace /repo --session chat-1 --file /repo/src/app.ts --role assistant "message"` — append a VS Code bridge event into the dedicated editor queue
-- `urchin mcp` — start the MCP server (stdio transport) for use with Claude Code and other MCP clients
-- `urchin serve` — start the HTTP intake server (auto-selects a free port, records it at `~/.local/state/urchin/intake.port`)
-- `urchin status` — show resolved config and sync state
-- `urchin doctor` — show blunt runtime diagnostics: what is shipped, what is reachable, what last ran, and what is still only planned
+| Source | How |
+|---|---|
+| **Claude** | Reads `~/.claude/history.jsonl` and project transcripts |
+| **Copilot CLI** | Reads `~/.copilot/session-state/` session logs and agent events |
+| **Gemini CLI** | Reads `~/.gemini/tmp/*/chats/*.json` |
+| **VS Code** | Bridge queue at `URCHIN_VSCODE_EVENTS_PATH` — populated via MCP or CLI |
+| **Shell** | Reads `~/.bash_history`, filters noise |
+| **Git** | Reads commit history across your repo roots |
+| **OpenClaw** | Reads command log and cron run JSONL from agent orchestration |
+| **Agent bridge** | Generic JSONL queue for Codex-style or custom runtimes |
+| **HTTP intake** | POST to `/ingest` from any tool, script, browser, or remote agent |
+
+---
+
+## Quick start
+
+```bash
+git clone https://github.com/samhcharles/urchin
+cd urchin
+npm install
+npm run build
+
+# Wire into an existing Obsidian vault
+node dist/src/index.js init --mode existing
+
+# Or scaffold a minimal vault layout from scratch
+node dist/src/index.js init --mode starter --vault ~/brain
+
+# Set up the background sync timer
+node dist/src/index.js setup-personal --mode existing --enable true
+
+# Confirm everything is wired
+node dist/src/index.js doctor
+```
+
+Set `URCHIN_VAULT_ROOT` to your vault path if it is not at `~/brain`. Every path is configurable — see [Configuration](#configuration).
+
+---
 
 ## MCP server
 
-`urchin mcp` exposes five tools over stdio:
+```bash
+node dist/src/index.js mcp
+```
 
-| Tool | Description |
-|---|---|
-| `urchin_status` | Current sync state: last sync time, event cache size, intake server health. **Call this at session start.** |
-| `urchin_ingest` | Record an activity event from any MCP-capable tool (Copilot, Gemini, Codex, Claude, Cursor, Continue.dev). Params: `content`, `workspace` (required); `source`, `session`, `title`, `file`, `kind`, `tags` (optional). |
-| `urchin_recent_activity` | Recent events across all sources. Params: `hours` (default 24), `source`, `limit` (default 20). |
-| `urchin_project_context` | Events matched to a project by name. Params: `project` (required), `hours` (default 168), `limit` (default 30). |
-| `urchin_search` | Full-text search over summary and content. Params: `query` (required), `hours` (default 168), `limit` (default 20). |
-
-The read tools read from a rolling 30-day JSONL event cache (`~/.local/share/urchin/event-cache.jsonl`) written during each `urchin sync`. Run at least one sync before querying.
-
-`urchin_ingest` writes immediately to the intake queue — no sync needed.
-
-### Wiring urchin into your AI tools
-
-**Claude Code** — add to `~/.claude/settings.json`:
+Wire into Claude Code (`~/.claude/settings.json`) or VS Code (`~/.config/Code/User/mcp.json`):
 
 ```json
 {
@@ -65,151 +81,206 @@ The read tools read from a rolling 30-day JSONL event cache (`~/.local/share/urc
 }
 ```
 
-**VS Code (Copilot, Continue.dev, any MCP client)** — add the same block to `~/.config/Code/User/mcp.json` under `"servers"`.
+Five tools available in any MCP-capable session:
 
-**Global session instructions** — create `~/.claude/CLAUDE.md` (Claude Code) or `~/.gemini/GEMINI.md` (Gemini CLI) with:
+| Tool | When to call it |
+|---|---|
+| `urchin_status` | **Start of every session** — confirms sync is live, shows last sync time and event count |
+| `urchin_ingest` | **End of every session** — records what was worked on. Params: `content`, `workspace` (required); `source`, `title`, `kind`, `tags` (optional) |
+| `urchin_recent_activity` | Need context on what was done across all tools. Params: `hours` (default 24), `source`, `limit` |
+| `urchin_project_context` | Need context scoped to one repo or project. Params: `project` (required), `hours`, `limit` |
+| `urchin_search` | Find when a topic was last touched. Params: `query` (required), `hours`, `limit` |
+
+The read tools (`urchin_recent_activity`, `urchin_project_context`, `urchin_search`) read from a rolling 30-day JSONL event cache written during each sync. The write tool (`urchin_ingest`) writes immediately — no sync required.
+
+Add a global instruction to your AI tool's config file to make this automatic:
 
 ```markdown
+# ~/.claude/CLAUDE.md  (Claude Code)
+# ~/.gemini/GEMINI.md  (Gemini CLI)
+
 ## Context sync
 Urchin is running. Call urchin_status at the start of this session.
 Call urchin_ingest at the end with a summary of what was worked on.
 ```
 
-**Shell** — add to `~/.bashrc`:
+---
+
+## HTTP intake server
+
+For tools that cannot use MCP — Gemini CLI, aider, shell scripts, browser extensions, remote VPS agents:
 
 ```bash
+# Start the server (auto-selects a free port)
+node dist/src/index.js serve
+
+# Or install as a systemd user service for always-on intake
+mkdir -p ~/.config/systemd/user
+cp assets/urchin-intake.service ~/.config/systemd/user/
+systemctl --user enable --now urchin-intake
+```
+
+The live port is written to `~/.local/state/urchin/intake.port` at startup. Read it from anywhere:
+
+```bash
+PORT=$(cat ~/.local/state/urchin/intake.port 2>/dev/null || echo 18799)
+
+# Record an event
+curl -s -X POST "http://127.0.0.1:$PORT/ingest" \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"what was done","source":"gemini","kind":"conversation"}'
+
+# Health check
+curl -s "http://127.0.0.1:$PORT/health"
+```
+
+**Shell alias:**
+
+```bash
+# Add to ~/.bashrc
 urchin-log() {
   local port=$(cat ~/.local/state/urchin/intake.port 2>/dev/null || echo 18799)
   curl -s -X POST "http://127.0.0.1:$port/ingest" \
     -H 'Content-Type: application/json' \
     -d "{\"content\":$(printf '%s' "$*" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))'),\"source\":\"shell\"}"
 }
+
+# Use it
+urchin-log "deployed the new API to VPS, tested health endpoint"
 ```
 
-**Any other tool** — read the port file and POST to `/ingest`:
+**Ingest event shape:**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `content` | string | ✓ | What was done |
+| `source` | string | | `claude`, `copilot`, `gemini`, `shell`, `vscode`, `agent`, `browser`, `manual` |
+| `kind` | string | | `conversation`, `agent`, `capture`, `activity`, `ops`, `code` |
+| `summary` | string | | Short label (defaults to first 140 chars of content) |
+| `tags` | string[] | | Additional tags for routing and search |
+| `sessionId` | string | | Group related events into a session |
+| `metadata` | object | | Arbitrary structured data |
+
+---
+
+## Commands
 
 ```bash
-PORT=$(cat ~/.local/state/urchin/intake.port 2>/dev/null || echo 18799)
-curl -s -X POST "http://127.0.0.1:$PORT/ingest" \
-  -H 'Content-Type: application/json' \
-  -d '{"content":"what was done","source":"gemini","kind":"conversation"}'
+urchin                                         # run sync
+urchin sync                                    # same as above
+urchin mcp                                     # start MCP server (stdio)
+urchin serve                                   # start HTTP intake server
+urchin dump "text"                             # append manual capture to vault inbox
+urchin ingest --source shell "text"            # append to intake queue
+urchin ingest-agent --agent codex "text"       # append to agent bridge queue
+urchin ingest-vscode --workspace /path "text"  # append to VS Code bridge queue
+urchin init --mode existing                    # wire into existing vault
+urchin init --mode starter --vault ~/brain     # scaffold new vault layout
+urchin setup-personal --enable true            # write systemd timer, env file, personal note
+urchin status                                  # print resolved config and last sync state
+urchin doctor                                  # runtime diagnostics — what works, what is missing
 ```
 
-The intake server selects a free port automatically (starting at `URCHIN_INTAKE_PORT`, default 18799) and writes the live port to `~/.local/state/urchin/intake.port`. No hardcoded ports, no conflicts.
+---
 
-**Always-on intake server** — install the systemd user service:
+## Configuration
 
-```bash
-mkdir -p ~/.config/systemd/user
-cp assets/urchin-intake.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now urchin-intake
-```
-
-After adding the MCP entry, restart your editor. The tools appear under `@urchin` in any Claude Code or Copilot session.
-
-If a collector fails during `urchin sync`, Urchin now refuses to advance the sync checkpoint. That keeps the next run from silently skipping activity.
-
-## Setup
-
-```bash
-npm install
-npm run build
-node dist/src/index.js init --mode existing
-node dist/src/index.js status
-```
-
-Urchin defaults to the local paths used in this workflow, but every important path is configurable:
+All paths are configurable via environment variables. Set them in `~/.config/urchin/personal.env`.
 
 | Variable | Default |
-| --- | --- |
-| `URCHIN_AGENT_EVENTS_PATH` | `~/.local/share/urchin/agents/events.jsonl` |
-| `URCHIN_EVENT_CACHE_PATH` | `~/.local/share/urchin/event-cache.jsonl` |
-| `URCHIN_INTAKE_PORT` | `18799` (auto-increments to find a free port) |
-| `URCHIN_INTAKE_PORT_FILE` | `~/.local/state/urchin/intake.port` |
+|---|---|
 | `URCHIN_VAULT_ROOT` | `~/brain` |
 | `URCHIN_ARCHIVE_ROOT` | `~/brain/40-archive/urchin` |
 | `URCHIN_STATE_PATH` | `~/.local/state/urchin/state.json` |
-| `URCHIN_INBOX_CAPTURE_PATH` | `~/brain/00-inbox/urchin-capture.md` |
+| `URCHIN_INTAKE_PORT` | `18799` (auto-increments if busy) |
+| `URCHIN_INTAKE_PORT_FILE` | `~/.local/state/urchin/intake.port` |
 | `URCHIN_INTAKE_ROOT` | `~/.local/share/urchin/intake` |
-| `URCHIN_COPILOT_SESSION_ROOT` | `~/.copilot/session-state` |
+| `URCHIN_EVENT_CACHE_PATH` | `~/.local/share/urchin/event-cache.jsonl` |
+| `URCHIN_AGENT_EVENTS_PATH` | `~/.local/share/urchin/agents/events.jsonl` |
 | `URCHIN_CLAUDE_HISTORY_FILE` | `~/.claude/history.jsonl` |
+| `URCHIN_COPILOT_SESSION_ROOT` | `~/.copilot/session-state` |
 | `URCHIN_GEMINI_TMP_ROOT` | `~/.gemini/tmp` |
+| `URCHIN_VSCODE_EVENTS_PATH` | `~/.local/share/urchin/editors/vscode/events.jsonl` |
 | `URCHIN_OPENCLAW_COMMANDS_LOG` | `~/.openclaw/logs/commands.log` |
 | `URCHIN_OPENCLAW_CRON_RUNS_DIR` | `~/.openclaw/cron/runs` |
-| `URCHIN_PROJECT_ALIAS_PATH` | `~/.config/urchin/project-aliases.json` |
-| `URCHIN_GIT_AUTHOR` | unset (falls back to repo `git config user.name`) |
 | `URCHIN_SHELL_HISTORY_FILE` | `~/.bash_history` |
 | `URCHIN_SHELL_IGNORE_PREFIXES` | `cd,ls,pwd,clear,history,exit` |
 | `URCHIN_SHELL_MIN_COMMAND_LENGTH` | `8` |
 | `URCHIN_REPOS_ROOTS` | `~/dev,~/repos` |
+| `URCHIN_GIT_AUTHOR` | from `git config user.name` |
 | `URCHIN_TIMER_CADENCE` | `5m` |
+| `URCHIN_PROJECT_ALIAS_PATH` | `~/.config/urchin/project-aliases.json` |
 | `URCHIN_VSCODE_WORKSPACE_ALIASES_PATH` | `~/.config/urchin/vscode-workspaces.json` |
-| `URCHIN_VSCODE_EVENTS_PATH` | `~/.local/share/urchin/editors/vscode/events.jsonl` |
+| `URCHIN_INBOX_CAPTURE_PATH` | `~/brain/00-inbox/urchin-capture.md` |
 
-For day-to-day use, start with `urchin setup-personal --enable true`, then use `urchin doctor` to confirm the timer, reachable sources, and runtime state.
+---
 
-`URCHIN_PROJECT_ALIAS_PATH` lets you pin repo or workspace names to real project notes when the names do not line up exactly.
+## Contributing
 
-## Personal workflow
+Urchin is built around a clean separation: **the core does not change when a new source is added**. You build a producer.
 
-If you want Urchin to feel like part of your real stack instead of a repo you manually poke:
+### Adding a new source
 
-```bash
-npm install
-npm run build
-node dist/src/index.js setup-personal --mode existing --enable true
-node dist/src/index.js doctor
-```
+Every source is one of three things:
 
-That writes:
+1. **A collector** (`src/collectors/`) — reads a local file or directory and returns `UrchinEvent[]`. Implement the `Collector` interface and register it in `src/index.ts`. See `src/collectors/gemini.ts` for a minimal example.
 
-- a personal env file at `~/.config/urchin/personal.env`
-- a user service and timer at `~/.config/systemd/user/urchin.{service,timer}`
-- a personal operating note at `30-resources/ai/urchin-personal.md`
+2. **An intake producer** — any external tool that POSTs to `POST /ingest` or appends to a JSONL queue under `URCHIN_INTAKE_ROOT`. No core changes needed. The contract is documented in [`docs/agent-contract.md`](docs/agent-contract.md) and [`docs/editor-contract.md`](docs/editor-contract.md).
 
-The timer keeps `urchin sync` moving in the background on a steady cadence, and the note gives you one place in the vault to check the current working setup.
+3. **An MCP client integration** — an instruction file or configuration block that tells an AI tool to call `urchin_ingest` at session end. No code changes needed.
 
-If you want faster VS Code capture without retyping full workspace paths, add aliases in `~/.config/urchin/vscode-workspaces.json`:
+### What makes a good contribution
 
-```json
-{
-  "urchin": "/home/samhc/dev/urchin"
-}
-```
+- A new collector for a tool with a local file trail (Cursor, Windsurf, Zed, JetBrains, Warp, etc.)
+- A browser extension that POSTs to the HTTP intake endpoint
+- A Neovim or JetBrains plugin that writes to the editor bridge queue
+- Documentation or examples for a tool that already works but is not documented
+- Tests for edge cases in existing collectors
 
-Then you can do:
-
-```bash
-urchin ingest-vscode --workspace urchin "Shipped a stronger sync summary"
-```
-
-The same local-first bridge pattern now applies to unsupported or custom agent runtimes:
-
-```bash
-urchin ingest-agent \
-  --agent codex \
-  --workspace urchin \
-  --status completed \
-  --model gpt-5.4 \
-  "Finished the collector pass"
-```
-
-That is not fake native Codex support. It is a real append-only bridge contract that lets Codex-style or custom agents land in the same sync pipeline once they can emit durable local events.
-
-Urchin now supports two install modes:
-
-- **existing** — create only the inbox/archive wiring Urchin needs inside an existing vault
-- **starter** — scaffold a minimal vault structure for people adopting Urchin as the beginning of a second brain
-
-See [`docs/editor-contract.md`](docs/editor-contract.md) for the first-class editor/IDE direction and [`docs/agent-contract.md`](docs/agent-contract.md) for the generic agent bridge contract.
-
-## Development
+### Running locally
 
 ```bash
 npm install
 npm run typecheck
 npm test
+
+# Test against real logs
+node dist/src/index.js sync
+node dist/src/index.js doctor
 ```
 
-Real development should use live local logs where possible, then confirm Urchin still writes clean archive notes into the vault.
+Tests live in `test/`. Every collector has a test fixture. Keep them passing — the build gate runs `npm test` before every merge.
+
+---
+
+## Roadmap
+
+| Spike | Status | Description |
+|---|---|---|
+| Core sync + vault writes | ✅ shipped | Deterministic archive, dedupe, provenance, per-source checkpoints |
+| MCP server | ✅ shipped | 5 tools over stdio — status, ingest, recent, project context, search |
+| HTTP intake server | ✅ shipped | `urchin serve`, smart port, port file, systemd unit |
+| VS Code bridge | ✅ shipped | `urchin_ingest` MCP tool + VSCode collector |
+| Agent bridge | ✅ shipped | Generic JSONL queue + `urchin ingest-agent` |
+| Universal awareness docs | ✅ shipped | Wiring guide for every major tool type |
+| VPS / remote bridge | 🔲 planned | SSH-pull remote cron run JSONL on sync |
+| Browser intake | 🔲 planned | Extension or bookmarklet POSTing to intake |
+| Neovim plugin | 🔲 planned | Editor bridge for terminal-first workflows |
+| JetBrains plugin | 🔲 planned | Native editor bridge for JetBrains IDEs |
+| Orinadus starter vault | 🔲 planned | Opinionated vault scaffold with Urchin pre-wired |
+
+---
+
+## Architecture
+
+See [`docs/architecture.md`](docs/architecture.md) for the full core-plus-spikes model, intake contracts, and output layer design.
+
+The short version: the core (`sync`, `dedupe`, `redact`, `state`, `config`) owns stable rules. Spikes are adapters — source collectors, intake producers, output writers — that plug into the core without changing it. New surfaces are new spikes, not core changes.
+
+---
+
+## Part of Orinadus
+
+Urchin is the first technology from [Orinadus](https://orinadus.com) — infrastructure for AI-heavy development workflows. The goal is simple: as the number of AI tools compounds, the memory fragmentation problem compounds with it. Urchin is the substrate that absorbs that fragmentation.
+
+If you work across multiple AI tools and the context never carries, this is built for you.
