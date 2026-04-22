@@ -1,5 +1,5 @@
 import * as fs from 'fs-extra';
-import { EventKind, EventSource, UrchinEvent } from '../types';
+import { EventIdentity, EventKind, EventSource, UrchinEvent } from '../types';
 
 export interface CachedEvent {
   id: string;
@@ -8,6 +8,7 @@ export interface CachedEvent {
   kind: EventKind;
   summary: string;
   content: string;
+  identity?: EventIdentity;
   tags: string[];
   metadata: Record<string, unknown>;
 }
@@ -38,6 +39,7 @@ export async function readCachedEvents(cachePath: string, opts: ReadOptions = {}
         kind: e.kind,
         summary: e.summary,
         content: e.content,
+        ...(e.identity ? { identity: e.identity } : {}),
         tags: e.tags ?? [],
         metadata: e.metadata ?? {},
       });

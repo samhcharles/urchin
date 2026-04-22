@@ -149,6 +149,7 @@ function formatEvents(events: Awaited<ReturnType<typeof readCachedEvents>>): str
       timestamp: e.timestamp,
       source: e.source,
       kind: e.kind,
+      identity: e.identity,
       summary: e.summary,
       tags: e.tags,
     })),

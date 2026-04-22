@@ -287,6 +287,7 @@ async function status(config: ReturnType<typeof loadConfig>) {
         archiveRoot: config.archiveRoot,
         claudeHistoryFile: config.claudeHistoryFile,
         copilotSessionRoot: config.copilotSessionRoot,
+        eventJournalPath: config.eventJournalPath,
         geminiTmpRoot: config.geminiTmpRoot,
         inboxCapturePath: config.inboxCapturePath,
         intakeRoot: config.intakeRoot,

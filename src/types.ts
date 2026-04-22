@@ -11,6 +11,7 @@ export type EventSource =
   | 'vscode';
 
 export type EventKind = 'activity' | 'agent' | 'capture' | 'code' | 'conversation' | 'ops';
+export type EventVisibility = 'private' | 'team' | 'public';
 
 export type AsyncAgentStatus = 'launched' | 'running' | 'completed' | 'failed';
 
@@ -32,6 +33,15 @@ export interface EventProvenance {
   sessionId?: string;
 }
 
+export interface EventIdentity {
+  accountId: string;
+  actorId: string;
+  deviceId: string;
+  projectId?: string;
+  visibility: EventVisibility;
+  workspaceId?: string;
+}
+
 export interface UrchinEvent {
   id: string;
   kind: EventKind;
@@ -41,6 +51,7 @@ export interface UrchinEvent {
   content: string;
   tags: string[];
   metadata: Record<string, unknown>;
+  identity?: EventIdentity;
   provenance: EventProvenance;
 }
 

@@ -61,6 +61,7 @@ async function withTempSyncHarness(
     openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
     openclawCronRunsDir: path.join(root, '.openclaw', 'cron', 'runs'),
     eventCachePath: path.join(root, '.local', 'share', 'urchin', 'event-cache.jsonl'),
+    eventJournalPath: path.join(root, '.local', 'share', 'urchin', 'journal', 'events.jsonl'),
     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     reposRoots: [path.join(root, 'dev')],
     shellIgnorePrefixes: ['cd', 'ls'],
@@ -122,6 +123,61 @@ test('runSync checkpoints from sync start when the run succeeds', async () => {
     assert.equal(result.writtenCount, 1);
     assert.equal(state.lastSuccessfulSyncAt, '2026-04-21T09:00:00.000Z');
   });
+});
+
+test('runSync writes canonical journal entries with identity fields', async () => {
+  const originalActorId = process.env.URCHIN_ACTOR_ID;
+  const originalAccountId = process.env.URCHIN_ACCOUNT_ID;
+  const originalDeviceId = process.env.URCHIN_DEVICE_ID;
+  const originalVisibility = process.env.URCHIN_DEFAULT_VISIBILITY;
+
+  process.env.URCHIN_ACTOR_ID = 'sam-founder';
+  process.env.URCHIN_ACCOUNT_ID = 'samhc';
+  process.env.URCHIN_DEVICE_ID = 'wsl-dev';
+  process.env.URCHIN_DEFAULT_VISIBILITY = 'team';
+
+  try {
+    await withTempSyncHarness(async (config, linker) => {
+      await runSync(config, {
+        collectors: [
+          new StaticCollector('vscode', [
+            event({
+              source: 'vscode',
+              metadata: { workspacePath: '/home/samhc/dev/urchin' },
+              provenance: {
+                adapter: 'vscode-bridge-jsonl',
+                location: '/tmp/vscode.jsonl',
+                repo: 'urchin',
+                scope: 'local',
+                sessionId: 'chat-1',
+              },
+            }),
+          ]),
+        ],
+        linker,
+        now: () => new Date('2026-04-21T09:00:00.000Z'),
+      });
+
+      const rawJournal = await fs.readFile(config.eventJournalPath, 'utf8');
+      const entry = JSON.parse(rawJournal.trim().split('\n')[0] ?? '{}');
+
+      assert.equal(entry.identity.actorId, 'sam-founder');
+      assert.equal(entry.identity.accountId, 'samhc');
+      assert.equal(entry.identity.deviceId, 'wsl-dev');
+      assert.equal(entry.identity.visibility, 'team');
+      assert.equal(entry.identity.workspaceId, 'urchin');
+      assert.equal(entry.identity.projectId, 'urchin');
+    });
+  } finally {
+    if (originalActorId === undefined) delete process.env.URCHIN_ACTOR_ID;
+    else process.env.URCHIN_ACTOR_ID = originalActorId;
+    if (originalAccountId === undefined) delete process.env.URCHIN_ACCOUNT_ID;
+    else process.env.URCHIN_ACCOUNT_ID = originalAccountId;
+    if (originalDeviceId === undefined) delete process.env.URCHIN_DEVICE_ID;
+    else process.env.URCHIN_DEVICE_ID = originalDeviceId;
+    if (originalVisibility === undefined) delete process.env.URCHIN_DEFAULT_VISIBILITY;
+    else process.env.URCHIN_DEFAULT_VISIBILITY = originalVisibility;
+  }
 });
 
 test('runSync does not advance state when any collector fails', async () => {

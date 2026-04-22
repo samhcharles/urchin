@@ -73,6 +73,7 @@ export function buildEnvFile(config: UrchinConfig): string {
     envLine('URCHIN_VAULT_ROOT', config.vaultRoot),
     envLine('URCHIN_ARCHIVE_ROOT', config.archiveRoot),
     envLine('URCHIN_STATE_PATH', config.statePath),
+    envLine('URCHIN_EVENT_JOURNAL_PATH', config.eventJournalPath),
     envLine('URCHIN_INBOX_CAPTURE_PATH', config.inboxCapturePath),
     envLine('URCHIN_INTAKE_ROOT', config.intakeRoot),
     envLine('URCHIN_COPILOT_SESSION_ROOT', config.copilotSessionRoot),

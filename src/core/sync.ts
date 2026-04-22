@@ -4,6 +4,7 @@ import { Linker } from '../synthesis/linker';
 import { Collector, UrchinEvent } from '../types';
 import { UrchinConfig } from './config';
 import { dedupeEvents } from './dedupe';
+import { appendEventJournal, toCanonicalEvent } from './journal';
 import { sanitize } from './redaction';
 import { loadState, saveState } from './state';
 import { promoteEvents } from '../obsidian/promote';
@@ -141,10 +142,11 @@ export async function runSync(config: UrchinConfig, options: RunSyncOptions): Pr
 
   allEvents.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   const uniqueEvents = dedupeEvents(allEvents);
-  const sanitizedEvents = uniqueEvents.map((event) => ({
+  const canonicalEvents = uniqueEvents.map((event) => toCanonicalEvent(event));
+  const sanitizedEvents = canonicalEvents.map((event) => ({
     ...event,
     summary: sanitize(event.summary, 240),
-      content: sanitize(event.content, event.kind === 'agent' ? 8000 : 1500),
+    content: sanitize(event.content, event.kind === 'agent' ? 8000 : 1500),
   }));
   const collectedCount = allEvents.length;
   const dedupedCount = uniqueEvents.length;
@@ -172,6 +174,7 @@ export async function runSync(config: UrchinConfig, options: RunSyncOptions): Pr
 
   await writeArchiveIndex(config);
   if (sanitizedEvents.length > 0) {
+    await appendEventJournal(config, sanitizedEvents);
     await appendEventCache(config, sanitizedEvents);
   }
 

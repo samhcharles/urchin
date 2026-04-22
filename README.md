@@ -6,6 +6,9 @@ You use Claude, Copilot, Gemini, Codex, VS Code, the shell. Each one starts fres
 
 Urchin fixes that. It collects activity from every tool you use, archives it into an Obsidian vault, and exposes it back as queryable context through an MCP server and an HTTP intake endpoint. One sync cadence. One archive. Every tool connected.
 
+Under the hood, Urchin now keeps a canonical append-only machine journal beneath the rolling cache
+and vault projections. Vault notes stay human-readable; the journal stays machine-readable.
+
 ```
 Claude ──┐
 Copilot ─┤                     ┌─ MCP tools (urchin_status, urchin_recent_activity...)
@@ -199,6 +202,7 @@ All paths are configurable via environment variables. Set them in `~/.config/urc
 | `URCHIN_INTAKE_PORT_FILE` | `~/.local/state/urchin/intake.port` |
 | `URCHIN_INTAKE_ROOT` | `~/.local/share/urchin/intake` |
 | `URCHIN_EVENT_CACHE_PATH` | `~/.local/share/urchin/event-cache.jsonl` |
+| `URCHIN_EVENT_JOURNAL_PATH` | `~/.local/share/urchin/journal/events.jsonl` |
 | `URCHIN_AGENT_EVENTS_PATH` | `~/.local/share/urchin/agents/events.jsonl` |
 | `URCHIN_CLAUDE_HISTORY_FILE` | `~/.claude/history.jsonl` |
 | `URCHIN_COPILOT_SESSION_ROOT` | `~/.copilot/session-state` |
@@ -215,6 +219,10 @@ All paths are configurable via environment variables. Set them in `~/.config/urc
 | `URCHIN_PROJECT_ALIAS_PATH` | `~/.config/urchin/project-aliases.json` |
 | `URCHIN_VSCODE_WORKSPACE_ALIASES_PATH` | `~/.config/urchin/vscode-workspaces.json` |
 | `URCHIN_INBOX_CAPTURE_PATH` | `~/brain/00-inbox/urchin-capture.md` |
+
+Identity fields in the canonical journal can be overridden with `URCHIN_ACTOR_ID`,
+`URCHIN_ACCOUNT_ID`, `URCHIN_DEVICE_ID`, and `URCHIN_DEFAULT_VISIBILITY`. If unset, Urchin falls
+back to the local username, hostname, and `private` visibility.
 
 ---
 
