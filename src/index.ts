@@ -5,6 +5,7 @@ import * as fs from 'fs-extra';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { setupIntakeService } from './bootstrap/intake';
 import { initializeVault, InitMode } from './bootstrap/init';
 import { setupPersonalWorkflow } from './bootstrap/personal';
 import { AgentCollector } from './collectors/agent';
@@ -95,6 +96,11 @@ async function main() {
     return;
   }
 
+  if (command === 'setup-intake') {
+    await setupIntake(config, args.slice(1));
+    return;
+  }
+
   if (command === 'setup-personal') {
     await setupPersonal(config, args.slice(1));
     return;
@@ -182,6 +188,25 @@ async function setupPersonal(config: ReturnType<typeof loadConfig>, args: string
   console.log(`Urchin: systemd available: ${result.state.systemdAvailable}`);
   console.log(`Urchin: timer enabled: ${result.state.timerEnabled === null ? 'unknown' : result.state.timerEnabled}`);
   console.log(`Urchin: timer active: ${result.state.timerActive === null ? 'unknown' : result.state.timerActive}`);
+}
+
+async function setupIntake(config: ReturnType<typeof loadConfig>, args: string[]) {
+  const { flags } = parseFlags(args);
+  const result = await setupIntakeService({
+    config,
+    enableSystemd: flags.enable === 'true',
+  });
+
+  console.log(`Urchin: intake service setup written to ${result.written.length} path(s).`);
+  if (result.created.length > 0) {
+    console.log(`Urchin: created ${result.created.length} new intake service path(s).`);
+  }
+  if (result.updated.length > 0) {
+    console.log(`Urchin: updated ${result.updated.length} existing intake service path(s).`);
+  }
+  console.log(`Urchin: systemd available: ${result.state.systemdAvailable}`);
+  console.log(`Urchin: intake service enabled: ${result.state.serviceEnabled === null ? 'unknown' : result.state.serviceEnabled}`);
+  console.log(`Urchin: intake service active: ${result.state.serviceActive === null ? 'unknown' : result.state.serviceActive}`);
 }
 
 function formatSyncSummary(result: Awaited<ReturnType<typeof runSync>>): string[] {

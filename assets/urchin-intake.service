@@ -5,6 +5,8 @@ After=network.target
 
 [Service]
 Type=simple
+# Template unit for environments where `urchin` is installed at ~/.local/bin/urchin.
+# Prefer `urchin setup-intake --enable true` to generate a machine-specific unit.
 ExecStart=%h/.local/bin/urchin serve
 Restart=on-failure
 RestartSec=5s

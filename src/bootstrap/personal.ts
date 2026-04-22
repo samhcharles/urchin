@@ -67,7 +67,7 @@ async function writeTrackedFile(targetPath: string, content: string, created: st
   }
 }
 
-function buildEnvFile(config: UrchinConfig): string {
+export function buildEnvFile(config: UrchinConfig): string {
   return [
     envLine('URCHIN_AGENT_EVENTS_PATH', config.agentEventsPath),
     envLine('URCHIN_VAULT_ROOT', config.vaultRoot),
@@ -98,7 +98,7 @@ function buildServiceFile(paths: PersonalPaths, nodePath: string, scriptPath: st
     '',
     '[Service]',
     'Type=oneshot',
-    `EnvironmentFile=${quoteSystemdArg(paths.envPath)}`,
+    `EnvironmentFile=${paths.envPath}`,
     `ExecStart=${quoteSystemdArg(nodePath)} ${quoteSystemdArg(scriptPath)} sync`,
     '',
     '[Install]',

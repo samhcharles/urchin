@@ -114,11 +114,13 @@ For tools that cannot use MCP — Gemini CLI, aider, shell scripts, browser exte
 # Start the server (auto-selects a free port)
 node dist/src/index.js serve
 
-# Or install as a systemd user service for always-on intake
-mkdir -p ~/.config/systemd/user
-cp assets/urchin-intake.service ~/.config/systemd/user/
-systemctl --user enable --now urchin-intake
+# Or generate and enable a machine-specific systemd user service
+node dist/src/index.js setup-intake --enable true
 ```
+
+`setup-intake` writes the user service with the real local `node` path, the real built Urchin
+script path, and the same env file Urchin uses for personal setup. That avoids the drift of a static
+unit file pointing at a binary that may not exist on the current machine.
 
 The live port is written to `~/.local/state/urchin/intake.port` at startup. Read it from anywhere:
 
@@ -175,6 +177,7 @@ urchin ingest --source shell "text"            # append to intake queue
 urchin ingest-agent --agent codex "text"       # append to agent bridge queue
 urchin ingest-vscode --workspace /path "text"  # append to VS Code bridge queue
 urchin init --mode existing                    # wire into existing vault
+urchin setup-intake --enable true              # write and enable machine-specific intake service
 urchin init --mode starter --vault ~/brain     # scaffold new vault layout
 urchin setup-personal --enable true            # write systemd timer, env file, personal note
 urchin status                                  # print resolved config and last sync state
