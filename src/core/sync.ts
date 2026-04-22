@@ -61,7 +61,10 @@ export async function runSync(config: UrchinConfig, options: RunSyncOptions): Pr
   const syncStartedAt = options.now?.() ?? new Date();
   const syncStartedAtIso = syncStartedAt.toISOString();
   const state = await loadState(config.statePath);
-  const sinceDate = state.lastSuccessfulSyncAt
+  // Global fallback: used only to populate sinceDate in the result. Per-source checkpoints
+  // take precedence so that new sources can backfill historical data without being blocked
+  // by a global checkpoint that predates their first appearance.
+  const globalSince = state.lastSuccessfulSyncAt
     ? new Date(state.lastSuccessfulSyncAt)
     : defaultSince(syncStartedAt);
 
@@ -71,6 +74,12 @@ export async function runSync(config: UrchinConfig, options: RunSyncOptions): Pr
   const sourceBreakdown: SyncSourceBreakdown[] = [];
 
   for (const collector of options.collectors) {
+    // Use per-source checkpoint so new sources can backfill and existing sources
+    // don't lose events after a partial-failure that advanced the global checkpoint.
+    const sourceState = state.sources?.[collector.name];
+    const sinceDate = sourceState?.lastSuccessAt
+      ? new Date(sourceState.lastSuccessAt)
+      : undefined;
     try {
       const events = await collector.collect(sinceDate);
       allEvents.push(...events);
@@ -158,7 +167,7 @@ export async function runSync(config: UrchinConfig, options: RunSyncOptions): Pr
     promotedPaths: promotionResult.promotedPaths,
     promotionNotReason: promotionResult.whyNot,
     promotionSummary: promotionResult.summary,
-    sinceDate: sinceDate.toISOString(),
+    sinceDate: globalSince.toISOString(),
     sourceBreakdown,
     writtenCount,
     writtenPaths,

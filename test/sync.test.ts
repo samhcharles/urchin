@@ -20,6 +20,20 @@ class StaticCollector implements Collector {
   }
 }
 
+class RecordingSinceCollector implements Collector {
+  public capturedSince: Date | undefined = undefined;
+
+  constructor(
+    public readonly name: Collector['name'],
+    private readonly events: UrchinEvent[],
+  ) {}
+
+  async collect(since?: Date): Promise<UrchinEvent[]> {
+    this.capturedSince = since;
+    return this.events;
+  }
+}
+
 class FailingCollector implements Collector {
   constructor(public readonly name: Collector['name']) {}
 
@@ -137,5 +151,33 @@ test('runSync does not advance state when any collector fails', async () => {
     assert.equal(state.lastSyncPromotedCount > 0, true);
     assert.equal(state.sources.git.lastSuccessAt, '2026-04-21T09:00:00.000Z');
     assert.equal(state.sources.claude.lastError, 'collector claude failed');
+  });
+});
+
+test('runSync uses per-source checkpoint so new sources backfill all history', async () => {
+  await withTempSyncHarness(async (config, linker) => {
+    await fs.ensureDir(path.dirname(config.statePath));
+    // git has run before with its own per-source checkpoint
+    await fs.writeJson(config.statePath, {
+      lastSuccessfulSyncAt: '2026-04-21T08:30:00.000Z',
+      sources: {
+        git: { lastSuccessAt: '2026-04-21T08:30:00.000Z', eventCount: 5 },
+      },
+    });
+
+    const gitCollector = new RecordingSinceCollector('git', [event()]);
+    // openclaw is a new source — not in state
+    const openclawCollector = new RecordingSinceCollector('openclaw', []);
+
+    await runSync(config, {
+      collectors: [gitCollector, openclawCollector],
+      linker,
+      now: () => new Date('2026-04-21T09:00:00.000Z'),
+    });
+
+    // git should receive its own per-source checkpoint
+    assert.equal(gitCollector.capturedSince?.toISOString(), '2026-04-21T08:30:00.000Z');
+    // openclaw is new — should receive undefined (no filter) so it can backfill
+    assert.equal(openclawCollector.capturedSince, undefined);
   });
 });
