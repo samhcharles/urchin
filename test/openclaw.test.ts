@@ -19,6 +19,8 @@ async function withTempConfig(run: (config: UrchinConfig) => Promise<void>) {
     geminiTmpRoot: path.join(root, '.gemini', 'tmp'),
     inboxCapturePath: path.join(vaultRoot, '00-inbox', 'urchin-capture.md'),
     intakeRoot: path.join(root, 'intake'),
+    intakePort: 18799,
+    intakePortFile: path.join(root, 'intake.port'),
     openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
     openclawCronRunsDir: path.join(root, '.openclaw', 'cron', 'runs'),
     eventCachePath: path.join(root, '.local', 'share', 'urchin', 'event-cache.jsonl'),

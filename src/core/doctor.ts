@@ -214,7 +214,12 @@ const SPIKE_REPORTS: DoctorSpikeReport[] = [
   {
     id: 'mcp-server',
     status: 'shipped',
-    note: 'Urchin exposes a stdio MCP server (urchin mcp) with three tools: urchin_recent_activity, urchin_project_context, urchin_search. Reads from rolling 30-day event cache written during sync.',
+    note: 'Urchin exposes a stdio MCP server (urchin mcp) with four tools: urchin_recent_activity, urchin_project_context, urchin_search, urchin_ingest. Reads from rolling 30-day event cache written during sync.',
+  },
+  {
+    id: 'intake-http',
+    status: 'shipped',
+    note: 'HTTP intake server (urchin serve) listens on a free port starting at URCHIN_INTAKE_PORT (default 18799). Live port is written to ~/.local/state/urchin/intake.port so any tool can discover it. POST /ingest, GET /health. Systemd unit in assets/urchin-intake.service.',
   },
   {
     id: 'editor-vscode',

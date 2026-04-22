@@ -16,17 +16,21 @@ const TOOL_DEFINITIONS = [
   {
     name: 'urchin_ingest',
     description:
-      'Record an activity event into Urchin. Call this at the end of a VS Code session (or any editor session) to capture what was done. The event lands in the VS Code bridge queue and is picked up by the next urchin sync.',
+      'Record an activity event into Urchin from any AI tool — Copilot, Gemini, Codex, Claude, Continue.dev, Cursor, or any MCP-capable client. Call this at the end of a session to capture what was worked on. The event is picked up by the next urchin sync.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         content: {
           type: 'string',
-          description: 'What was done — a short description or the assistant message summarising the session',
+          description: 'What was done — a description or summary of the session',
         },
         workspace: {
           type: 'string',
           description: 'Absolute path to the workspace or repo (e.g. /home/samhc/dev/urchin)',
+        },
+        source: {
+          type: 'string',
+          description: 'Which AI tool is reporting: copilot, gemini, vscode, claude, agent, browser, shell (default: vscode)',
         },
         session: {
           type: 'string',
@@ -40,13 +44,14 @@ const TOOL_DEFINITIONS = [
           type: 'string',
           description: 'Primary file being edited (optional)',
         },
-        role: {
-          type: 'string',
-          description: 'Role of the message author: "user" or "assistant" (optional)',
-        },
         kind: {
           type: 'string',
           description: 'Event kind: "conversation" (default) or "agent"',
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Additional tags (optional)',
         },
       },
       required: ['content', 'workspace'],
@@ -162,32 +167,41 @@ export async function startMcpServer(config: UrchinConfig): Promise<void> {
         return { content: [{ type: 'text', text: 'content and workspace are required.' }], isError: true };
       }
 
+      const source = typeof params.source === 'string' && KNOWN_SOURCES.includes(params.source as EventSource)
+        ? (params.source as EventSource)
+        : 'vscode';
       const workspaceBase = path.basename(workspace);
       const today = new Date().toISOString().slice(0, 10);
       const sessionId = typeof params.session === 'string' && params.session.trim()
         ? params.session.trim()
         : `${workspaceBase.replace(/[^a-zA-Z0-9._-]+/g, '-').toLowerCase()}-${today}`;
 
+      const title = typeof params.title === 'string' && params.title.trim() ? params.title.trim() : undefined;
+      const extraTags = Array.isArray(params.tags) ? params.tags.filter((t): t is string => typeof t === 'string') : [];
+
       const event = {
         id: randomUUID(),
-        content,
-        filePath: typeof params.file === 'string' && params.file.trim() ? params.file.trim() : undefined,
+        source,
         kind: params.kind === 'agent' ? 'agent' : 'conversation',
-        role: typeof params.role === 'string' && params.role.trim() ? params.role.trim() : undefined,
-        sessionId,
-        summary: typeof params.title === 'string' && params.title.trim()
-          ? `VS Code — ${params.title.trim()}`
-          : content.slice(0, 140),
+        content,
+        summary: title ? `${source} — ${title}` : content.slice(0, 140),
         timestamp: new Date().toISOString(),
-        title: typeof params.title === 'string' && params.title.trim() ? params.title.trim() : undefined,
-        workspacePath: workspace,
+        tags: [source, 'mcp-ingest', ...extraTags],
+        metadata: {
+          workspacePath: workspace,
+          ...(typeof params.file === 'string' && params.file.trim() ? { filePath: params.file.trim() } : {}),
+          ...(title ? { title } : {}),
+        },
+        sessionId,
+        scope: 'local',
       };
 
-      await fs.ensureDir(path.dirname(config.vscodeEventsPath));
-      await fs.appendFile(config.vscodeEventsPath, `${JSON.stringify(event)}\n`, 'utf8');
+      const intakeFile = path.join(config.intakeRoot, `${source}.jsonl`);
+      await fs.ensureDir(config.intakeRoot);
+      await fs.appendFile(intakeFile, `${JSON.stringify(event)}\n`, 'utf8');
 
       return {
-        content: [{ type: 'text', text: `Recorded to Urchin: ${event.summary.slice(0, 80)}` }],
+        content: [{ type: 'text', text: `Recorded [${source}]: ${event.summary.slice(0, 80)}` }],
       };
     }
 

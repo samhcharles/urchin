@@ -11,6 +11,8 @@ export interface UrchinConfig {
   geminiTmpRoot: string;
   gitAuthor?: string;
   inboxCapturePath: string;
+  intakePort: number;
+  intakePortFile: string;
   intakeRoot: string;
   openclawCommandsLog: string;
   openclawCronRunsDir: string;
@@ -74,6 +76,8 @@ export function loadConfig(): UrchinConfig {
     geminiTmpRoot: expandHome(process.env.URCHIN_GEMINI_TMP_ROOT ?? '~/.gemini/tmp'),
     gitAuthor: process.env.URCHIN_GIT_AUTHOR?.trim() || undefined,
     inboxCapturePath: expandHome(process.env.URCHIN_INBOX_CAPTURE_PATH ?? path.join(vaultRoot, '00-inbox', 'urchin-capture.md')),
+    intakePort: Number(process.env.URCHIN_INTAKE_PORT ?? '18799'),
+    intakePortFile: expandHome(process.env.URCHIN_INTAKE_PORT_FILE ?? '~/.local/state/urchin/intake.port'),
     intakeRoot: expandHome(process.env.URCHIN_INTAKE_ROOT ?? '~/.local/share/urchin/intake'),
     openclawCommandsLog: expandHome(process.env.URCHIN_OPENCLAW_COMMANDS_LOG ?? '~/.openclaw/logs/commands.log'),
     openclawCronRunsDir: expandHome(process.env.URCHIN_OPENCLAW_CRON_RUNS_DIR ?? '~/.openclaw/cron/runs'),

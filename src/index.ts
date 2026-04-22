@@ -17,6 +17,7 @@ import { GitCollector, ShellCollector } from './collectors/shell';
 import { VSCodeCollector } from './collectors/vscode';
 import { loadConfig } from './core/config';
 import { buildDoctorReport } from './core/doctor';
+import { startIntakeServer } from './intake/server';
 import { startMcpServer } from './mcp/server';
 import { runSync } from './core/sync';
 import { loadState } from './core/state';
@@ -55,6 +56,11 @@ async function main() {
 
   if (command === 'mcp') {
     await startMcpServer(config);
+    return;
+  }
+
+  if (command === 'serve') {
+    await serve(config);
     return;
   }
 
@@ -419,6 +425,24 @@ async function resolveWorkspacePath(config: ReturnType<typeof loadConfig>, works
   }
 
   return workspaceArg;
+}
+
+async function serve(config: ReturnType<typeof loadConfig>) {
+  const { server, port } = await startIntakeServer(config);
+  console.log(`Urchin: intake server listening on http://127.0.0.1:${port}`);
+  console.log(`Urchin: port recorded at ${config.intakePortFile}`);
+  console.log('Urchin: POST /ingest  { content, source?, kind?, summary?, tags?, metadata? }');
+  console.log('Urchin: GET  /health  → { status: "ok", service: "urchin-intake", port }');
+
+  const shutdown = async () => {
+    await fs.remove(config.intakePortFile).catch(() => undefined);
+    server.close();
+    process.exit(0);
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+
+  await new Promise(() => { /* keep alive */ });
 }
 
 main().catch((error) => {

@@ -1,0 +1,17 @@
+[Unit]
+Description=Urchin intake server — local HTTP endpoint for multi-agent context capture
+Documentation=https://github.com/samhcharles/urchin
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/urchin serve
+Restart=on-failure
+RestartSec=5s
+
+# Port discovery: the live port is written to ~/.local/state/urchin/intake.port on start.
+# Any tool reads that file to find the server — no hardcoded port required.
+# Override the preferred port with: Environment=URCHIN_INTAKE_PORT=18800
+
+[Install]
+WantedBy=default.target
