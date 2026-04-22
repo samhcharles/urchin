@@ -212,6 +212,11 @@ const SOURCE_SPECS: SourceSpec[] = [
 
 const SPIKE_REPORTS: DoctorSpikeReport[] = [
   {
+    id: 'mcp-server',
+    status: 'shipped',
+    note: 'Urchin exposes a stdio MCP server (urchin mcp) with three tools: urchin_recent_activity, urchin_project_context, urchin_search. Reads from rolling 30-day event cache written during sync.',
+  },
+  {
     id: 'editor-vscode',
     status: 'shipped',
     note: 'VS Code / VSCodium now has a shipped local bridge contract through the dedicated queue file and collector.',

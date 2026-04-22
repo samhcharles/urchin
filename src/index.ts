@@ -17,6 +17,7 @@ import { GitCollector, ShellCollector } from './collectors/shell';
 import { VSCodeCollector } from './collectors/vscode';
 import { loadConfig } from './core/config';
 import { buildDoctorReport } from './core/doctor';
+import { startMcpServer } from './mcp/server';
 import { runSync } from './core/sync';
 import { loadState } from './core/state';
 import { appendManualCapture } from './obsidian/writer';
@@ -51,6 +52,11 @@ async function main() {
   const config = loadConfig();
   const args = process.argv.slice(2);
   const command = args[0];
+
+  if (command === 'mcp') {
+    await startMcpServer(config);
+    return;
+  }
 
   if (command === 'dump') {
     const text = args.slice(1).join(' ');
