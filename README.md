@@ -29,8 +29,36 @@ See [`docs/architecture.md`](docs/architecture.md) for the core-plus-spikes mode
 - `urchin ingest --source browser --kind capture --scope network "captured text"` — append an external/browser-style event into the bounded intake queue
 - `urchin ingest-agent --agent codex --workspace urchin --status completed "message"` — append a generic local agent event into the dedicated agent bridge queue
 - `urchin ingest-vscode --workspace /repo --session chat-1 --file /repo/src/app.ts --role assistant "message"` — append a VS Code bridge event into the dedicated editor queue
+- `urchin mcp` — start the MCP server (stdio transport) for use with Claude Code and other MCP clients
 - `urchin status` — show resolved config and sync state
 - `urchin doctor` — show blunt runtime diagnostics: what is shipped, what is reachable, what last ran, and what is still only planned
+
+## MCP server
+
+`urchin mcp` exposes three tools over stdio:
+
+| Tool | Description |
+|---|---|
+| `urchin_recent_activity` | Recent events across all sources. Params: `hours` (default 24), `source`, `limit` (default 20). |
+| `urchin_project_context` | Events matched to a project by name. Params: `project` (required), `hours` (default 168), `limit` (default 30). |
+| `urchin_search` | Full-text search over summary and content. Params: `query` (required), `hours` (default 168), `limit` (default 20). |
+
+The server reads from a rolling 30-day JSONL event cache (`~/.local/share/urchin/event-cache.jsonl`) written during each `urchin sync`. Run at least one sync before querying.
+
+**Wire into Claude Code** — add to `~/.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "urchin": {
+      "command": "node",
+      "args": ["/path/to/urchin/dist/src/index.js", "mcp"]
+    }
+  }
+}
+```
+
+After adding the entry, restart Claude Code. The three tools appear under `@urchin` in any session.
 
 If a collector fails during `urchin sync`, Urchin now refuses to advance the sync checkpoint. That keeps the next run from silently skipping activity.
 
@@ -48,6 +76,7 @@ Urchin defaults to the local paths used in this workflow, but every important pa
 | Variable | Default |
 | --- | --- |
 | `URCHIN_AGENT_EVENTS_PATH` | `~/.local/share/urchin/agents/events.jsonl` |
+| `URCHIN_EVENT_CACHE_PATH` | `~/.local/share/urchin/event-cache.jsonl` |
 | `URCHIN_VAULT_ROOT` | `~/brain` |
 | `URCHIN_ARCHIVE_ROOT` | `~/brain/40-archive/urchin` |
 | `URCHIN_STATE_PATH` | `~/.local/state/urchin/state.json` |
