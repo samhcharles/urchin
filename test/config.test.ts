@@ -14,6 +14,7 @@ test('loadConfig defaults to the brain vault and archive paths', () => {
   assert.match(config.eventJournalPath, /urchin[\/\\]journal[\/\\]events\.jsonl$/);
   assert.match(config.identityPath, /urchin[\/\\]identity\.json$/);
   assert.match(config.remoteMirrorRoot, /urchin[\/\\]remotes$/);
+  assert.match(config.remoteSourcesPath, /urchin[\/\\]remotes\.json$/);
   assert.equal(config.timerCadence, '5m');
   assert.match(config.vscodeEventsPath, /urchin[\/\\]editors[\/\\]vscode[\/\\]events\.jsonl$/);
   assert.match(config.vscodeWorkspaceAliasesPath, /urchin[\/\\]vscode-workspaces\.json$/);

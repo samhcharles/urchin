@@ -28,6 +28,7 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
     openclawCronRunsDir: path.join(root, '.openclaw', 'cron', 'runs'),
     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     remoteMirrorRoot: path.join(root, '.local', 'share', 'urchin', 'remotes'),
+    remoteSourcesPath: path.join(root, '.config', 'urchin', 'remotes.json'),
     reposRoots: [path.join(root, 'dev')],
     shellIgnorePrefixes: ['cd', 'ls'],
     shellMinCommandLength: 8,

@@ -28,7 +28,8 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
      eventJournalPath: path.join(root, '.local', 'share', 'urchin', 'journal', 'events.jsonl'),
      identityPath: path.join(root, '.config', 'urchin', 'identity.json'),
      projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
-     remoteMirrorRoot: path.join(root, '.local', 'share', 'urchin', 'remotes'),
+    remoteMirrorRoot: path.join(root, '.local', 'share', 'urchin', 'remotes'),
+    remoteSourcesPath: path.join(root, '.config', 'urchin', 'remotes.json'),
     reposRoots: [path.join(root, 'dev'), path.join(root, 'repos')],
     shellIgnorePrefixes: ['cd', 'ls'],
     shellMinCommandLength: 8,
@@ -83,6 +84,9 @@ test('buildDoctorReport distinguishes reachable shipped collectors from planned 
     await fs.ensureDir(path.join(root, '.config', 'urchin'));
     await fs.ensureDir(path.join(root, '.config', 'systemd', 'user'));
       await fs.writeFile(path.join(root, '.config', 'urchin', 'personal.env'), 'URCHIN_VAULT_ROOT="/tmp/vault"\n', 'utf8');
+      await fs.writeJson(config.remoteSourcesPath, {
+        remotes: [{ name: 'vps', host: 'user@2.24.29.238' }],
+      });
       await fs.writeJson(path.join(root, '.config', 'urchin', 'identity.json'), {
         accountId: 'samhc',
         actorId: 'sam-founder',
@@ -154,6 +158,7 @@ test('buildDoctorReport distinguishes reachable shipped collectors from planned 
       const remote = report.sources.find((source) => source.source === 'remote');
       assert.ok(remote);
       assert.equal(remote.status, 'ready');
+      assert.equal(remote.details?.configuredRemotes, 1);
       assert.equal(remote.details?.mirroredNodes, 1);
 
       assert.equal(report.sync.shippedSourceCount, 10);

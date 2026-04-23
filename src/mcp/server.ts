@@ -6,6 +6,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { UrchinConfig } from '../core/config';
 import { resolveNodeIdentity } from '../core/identity';
+import { loadRemoteSources } from '../replication/remote';
 import { loadState } from '../core/state';
 import { EventSource } from '../types';
 import { readCachedEvents } from './reader';
@@ -316,6 +317,14 @@ export async function startMcpServer(config: UrchinConfig): Promise<void> {
       }
 
       const identity = await resolveNodeIdentity(config);
+      let remoteConfiguredCount = 0;
+      let remoteConfigError: string | undefined;
+      try {
+        const remoteSources = await loadRemoteSources(config);
+        remoteConfiguredCount = remoteSources.remotes.length;
+      } catch (error) {
+        remoteConfigError = error instanceof Error ? error.message : String(error);
+      }
       const statusPayload = {
         running: true,
         lastSyncAt,
@@ -326,6 +335,9 @@ export async function startMcpServer(config: UrchinConfig): Promise<void> {
         identity: identity.identity,
         identityFileExists: identity.exists,
         remoteMirrorRoot: config.remoteMirrorRoot,
+        remoteConfiguredCount,
+        remoteSourcesPath: config.remoteSourcesPath,
+        ...(remoteConfigError ? { remoteConfigError } : {}),
         vaultRoot: config.vaultRoot,
         eventCachePath: config.eventCachePath,
       };

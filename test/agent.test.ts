@@ -30,6 +30,7 @@ async function withTempHarness(run: (config: UrchinConfig, linker: Linker) => Pr
     identityPath: path.join(root, '.config', 'urchin', 'identity.json'),
     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     remoteMirrorRoot: path.join(root, '.local', 'share', 'urchin', 'remotes'),
+    remoteSourcesPath: path.join(root, '.config', 'urchin', 'remotes.json'),
     reposRoots: [path.join(root, 'dev')],
     shellIgnorePrefixes: ['cd', 'ls'],
     shellMinCommandLength: 8,

@@ -31,6 +31,7 @@ async function withTempRepo(run: (config: UrchinConfig, repoPath: string) => Pro
     identityPath: path.join(root, '.config', 'urchin', 'identity.json'),
     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     remoteMirrorRoot: path.join(root, '.local', 'share', 'urchin', 'remotes'),
+    remoteSourcesPath: path.join(root, '.config', 'urchin', 'remotes.json'),
     reposRoots: [reposRoot],
     shellIgnorePrefixes: ['cd', 'ls'],
     shellMinCommandLength: 8,

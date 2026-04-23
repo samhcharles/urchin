@@ -6,7 +6,7 @@ import * as path from 'node:path';
 import { getPersonalAutomationState, resolvePersonalPaths } from '../bootstrap/personal';
 import { UrchinConfig } from './config';
 import { resolveNodeIdentity } from './identity';
-import { RemoteMirrorManifest } from '../replication/remote';
+import { loadRemoteSources, RemoteMirrorManifest } from '../replication/remote';
 import { loadState, SourceSyncState } from './state';
 import { EventSource } from '../types';
 
@@ -186,8 +186,23 @@ const SOURCE_SPECS: SourceSpec[] = [
     paths: (config) => [config.remoteMirrorRoot],
     status: ([root]) => (root?.exists ? 'ready' : 'missing'),
     details: async (config) => {
+      let configuredRemotes = 0;
+      let configError: string | undefined;
+      try {
+        const loaded = await loadRemoteSources(config);
+        configuredRemotes = loaded.remotes.length;
+      } catch (error) {
+        configError = error instanceof Error ? error.message : String(error);
+      }
+
       if (!(await fs.pathExists(config.remoteMirrorRoot))) {
-        return { mirroredNodes: 0, remoteHosts: '' };
+        return {
+          configuredRemotes,
+          ...(configError ? { configError } : {}),
+          mirroredNodes: 0,
+          remoteHosts: '',
+          sourcesPath: config.remoteSourcesPath,
+        };
       }
 
       const children = await fs.readdir(config.remoteMirrorRoot).catch(() => []);
@@ -205,8 +220,11 @@ const SOURCE_SPECS: SourceSpec[] = [
       }
 
       return {
+        configuredRemotes,
+        ...(configError ? { configError } : {}),
         mirroredNodes: manifests.length,
         remoteHosts: manifests.map((manifest) => manifest.host).join(', '),
+        sourcesPath: config.remoteSourcesPath,
       };
     },
   },

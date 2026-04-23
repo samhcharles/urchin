@@ -25,7 +25,7 @@ import { startMcpServer } from './mcp/server';
 import { runSync } from './core/sync';
 import { loadState } from './core/state';
 import { appendManualCapture } from './obsidian/writer';
-import { pullRemoteJournal } from './replication/remote';
+import { loadRemoteSources, pullConfiguredRemoteJournals, pullRemoteJournal } from './replication/remote';
 import { Linker } from './synthesis/linker';
 import { Collector, EventKind, EventSource } from './types';
 
@@ -126,6 +126,11 @@ async function main() {
 
   if (command === 'pull-remote') {
     await pullRemote(config, args.slice(1));
+    return;
+  }
+
+  if (command === 'pull-remotes') {
+    await pullRemotes(config);
     return;
   }
 
@@ -244,6 +249,17 @@ function formatSyncSummary(result: Awaited<ReturnType<typeof runSync>>): string[
 }
 
 async function sync(config: ReturnType<typeof loadConfig>) {
+  const remotePulls = await pullConfiguredRemoteJournals({ config });
+  if (remotePulls.configuredCount > 0) {
+    console.log(`Urchin: configured remote sources ${remotePulls.configuredCount} from ${remotePulls.configPath}`);
+  }
+  for (const remote of remotePulls.pulled) {
+    console.log(`Urchin: mirrored ${remote.eventCount} remote event(s) from ${remote.host} into ${remote.journalMirrorPath}`);
+  }
+  for (const failure of remotePulls.failures) {
+    console.error(`Urchin: remote pull ${failure.name} (${failure.host}) failed (${failure.error}).`);
+  }
+
   const collectors: Collector[] = [
     new AgentCollector(config),
     new IntakeCollector(config),
@@ -290,11 +306,23 @@ async function sync(config: ReturnType<typeof loadConfig>) {
   for (const line of formatSyncSummary(result)) {
     console.log(line);
   }
+
+  if (remotePulls.failures.length > 0) {
+    process.exitCode = 1;
+  }
 }
 
 async function status(config: ReturnType<typeof loadConfig>) {
   const state = await loadState(config.statePath);
   const identity = await resolveNodeIdentity(config);
+  let remoteConfiguredCount = 0;
+  let remoteConfigError: string | undefined;
+  try {
+    const remoteSources = await loadRemoteSources(config);
+    remoteConfiguredCount = remoteSources.remotes.length;
+  } catch (error) {
+    remoteConfigError = error instanceof Error ? error.message : String(error);
+  }
   console.log(
     JSON.stringify(
       {
@@ -315,6 +343,9 @@ async function status(config: ReturnType<typeof loadConfig>) {
         openclawCronRunsDir: config.openclawCronRunsDir,
         projectAliasPath: config.projectAliasPath,
         remoteMirrorRoot: config.remoteMirrorRoot,
+        remoteConfiguredCount,
+        remoteSourcesPath: config.remoteSourcesPath,
+        ...(remoteConfigError ? { remoteConfigError } : {}),
         reposRoots: config.reposRoots,
         shellHistoryFile: config.shellHistoryFile,
         statePath: config.statePath,
@@ -386,6 +417,21 @@ async function pullRemote(config: ReturnType<typeof loadConfig>, args: string[])
   console.log(`Urchin: mirrored ${result.eventCount} remote event(s) from ${result.host} into ${result.journalMirrorPath}`);
   console.log(`Urchin: identity fetched: ${result.identityFetched}`);
   console.log(`Urchin: manifest written to ${result.manifestPath}`);
+}
+
+async function pullRemotes(config: ReturnType<typeof loadConfig>) {
+  const result = await pullConfiguredRemoteJournals({ config });
+  console.log(`Urchin: configured remote sources ${result.configuredCount} from ${result.configPath}`);
+  for (const remote of result.pulled) {
+    console.log(`Urchin: mirrored ${remote.eventCount} remote event(s) from ${remote.host} into ${remote.journalMirrorPath}`);
+  }
+  for (const failure of result.failures) {
+    console.error(`Urchin: remote pull ${failure.name} (${failure.host}) failed (${failure.error}).`);
+  }
+
+  if (result.failures.length > 0) {
+    process.exitCode = 1;
+  }
 }
 
 async function ingest(config: ReturnType<typeof loadConfig>, args: string[]) {

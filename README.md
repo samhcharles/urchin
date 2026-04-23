@@ -197,6 +197,7 @@ urchin setup-personal --enable true            # write systemd timer, env file, 
 urchin identity                                # print resolved node identity and its source
 urchin identity --write true --device vps-1    # persist actor/account/device identity for this node
 urchin pull-remote --name vps --host user@host # mirror a remote node journal over SSH into local sync
+urchin pull-remotes                            # mirror every configured remote source
 urchin status                                  # print resolved config and last sync state
 urchin doctor                                  # runtime diagnostics — what works, what is missing
 ```
@@ -235,6 +236,7 @@ All paths are configurable via environment variables. Set them in `~/.config/urc
 | `URCHIN_PROJECT_ALIAS_PATH` | `~/.config/urchin/project-aliases.json` |
 | `URCHIN_VSCODE_WORKSPACE_ALIASES_PATH` | `~/.config/urchin/vscode-workspaces.json` |
 | `URCHIN_INBOX_CAPTURE_PATH` | `~/brain/00-inbox/urchin-capture.md` |
+| `URCHIN_REMOTE_SOURCES_PATH` | `~/.config/urchin/remotes.json` |
 
 Urchin now persists node identity at `~/.config/urchin/identity.json` so WSL, VPS, and other nodes
 can carry durable actor/account/device identity instead of depending only on transient env vars.
@@ -258,6 +260,22 @@ urchin sync
 The next `urchin sync` reads that mirror through the remote collector and lands those events in the
 same archive, project notes, cache, and MCP surfaces. This is a truthful bridge, not full automatic
 replication yet.
+
+For repeatable pulls, define remote sources in `~/.config/urchin/remotes.json`:
+
+```json
+{
+  "remotes": [
+    {
+      "name": "vps",
+      "host": "user@2.24.29.238"
+    }
+  ]
+}
+```
+
+Then either run `urchin pull-remotes` directly or let normal `urchin sync` pull configured remotes
+before collecting local and mirrored events.
 
 ---
 
@@ -312,7 +330,8 @@ Tests live in `test/`. Every collector has a test fixture. Keep them passing —
 | Durable node identity | ✅ shipped | Persist actor/account/device identity in `~/.config/urchin/identity.json` and surface it in status/doctor |
 | Remote journal pull bridge | ✅ shipped | Mirror a remote node journal over SSH into the local sync pipeline |
 | Replication foundation | 🔲 planned | Move journal continuity cleanly across WSL / Windows / VPS |
-| VPS / remote automation | 🔲 planned | Automatic timers or pull flows for remote nodes instead of manual bridge commands |
+| Configured remote sync | ✅ shipped | `urchin sync` can auto-pull configured remotes from `~/.config/urchin/remotes.json` |
+| VPS / remote automation | 🔲 planned | stronger service-backed or bidirectional flows beyond configured SSH pulls |
 | Browser intake | 🔲 planned | Extension or bookmarklet POSTing to intake |
 | Neovim plugin | 🔲 planned | Editor bridge for terminal-first workflows |
 | JetBrains plugin | 🔲 planned | Native editor bridge for JetBrains IDEs |

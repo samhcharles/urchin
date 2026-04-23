@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import test from 'node:test';
 
 import { UrchinConfig } from '../src/core/config';
-import { pullRemoteJournal } from '../src/replication/remote';
+import { loadRemoteSources, pullConfiguredRemoteJournals, pullRemoteJournal } from '../src/replication/remote';
 
 async function withTempConfig(run: (config: UrchinConfig, root: string) => Promise<void>) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'urchin-remote-pull-'));
@@ -28,6 +28,7 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
     openclawCronRunsDir: path.join(root, '.openclaw', 'cron', 'runs'),
     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     remoteMirrorRoot: path.join(root, '.local', 'share', 'urchin', 'remotes'),
+    remoteSourcesPath: path.join(root, '.config', 'urchin', 'remotes.json'),
     reposRoots: [path.join(root, 'dev')],
     shellIgnorePrefixes: ['cd', 'ls'],
     shellMinCommandLength: 8,
@@ -101,5 +102,67 @@ test('pullRemoteJournal keeps working when remote identity is missing', async ()
     assert.equal(result.identityFetched, false);
     assert.equal(await fs.pathExists(result.identityMirrorPath), false);
     assert.equal(await fs.pathExists(result.manifestPath), true);
+  });
+});
+
+test('loadRemoteSources reads enabled remotes from remotes.json', async () => {
+  await withTempConfig(async (config) => {
+    await fs.ensureDir(path.dirname(config.remoteSourcesPath));
+    await fs.writeJson(config.remoteSourcesPath, {
+      remotes: [
+        { name: 'vps', host: 'user@host' },
+        { name: 'disabled', host: 'user@disabled', enabled: false },
+      ],
+    });
+
+    const loaded = await loadRemoteSources(config);
+    assert.equal(loaded.configExists, true);
+    assert.equal(loaded.remotes.length, 1);
+    assert.equal(loaded.remotes[0]?.name, 'vps');
+    assert.equal(loaded.remotes[0]?.host, 'user@host');
+  });
+});
+
+test('pullConfiguredRemoteJournals mirrors every configured remote', async () => {
+  await withTempConfig(async (config) => {
+    await fs.ensureDir(path.dirname(config.remoteSourcesPath));
+    await fs.writeJson(config.remoteSourcesPath, {
+      remotes: [
+        { name: 'vps', host: 'user@host' },
+        { name: 'lab', host: 'user@lab' },
+      ],
+    });
+
+    const result = await pullConfiguredRemoteJournals({
+      config,
+      runCommand: async (_file, args) => {
+        const host = args[0] ?? '';
+        const command = args[1] ?? '';
+        if (command.includes('journal')) {
+          return {
+            stdout: `{"id":"evt-${host}","kind":"conversation","source":"claude","timestamp":"2026-04-22T21:00:00.000Z","summary":"remote","content":"${host}","tags":[],"metadata":{},"provenance":{"adapter":"claude-history","location":"/remote/history.jsonl","scope":"local"}}\n`,
+          };
+        }
+
+        return {
+          stdout: `{"accountId":"samhc","actorId":"samhc","deviceId":"${host.replace(/[^a-z0-9-]/gi, '-')}-1","visibility":"private"}\n`,
+        };
+      },
+    });
+
+    assert.equal(result.configuredCount, 2);
+    assert.equal(result.failures.length, 0);
+    assert.equal(result.pulled.length, 2);
+    assert.equal(await fs.pathExists(path.join(config.remoteMirrorRoot, 'vps', 'events.jsonl')), true);
+    assert.equal(await fs.pathExists(path.join(config.remoteMirrorRoot, 'lab', 'events.jsonl')), true);
+  });
+});
+
+test('loadRemoteSources fails loudly on invalid config shape', async () => {
+  await withTempConfig(async (config) => {
+    await fs.ensureDir(path.dirname(config.remoteSourcesPath));
+    await fs.writeJson(config.remoteSourcesPath, { remotes: [{ name: 'vps' }] });
+
+    await assert.rejects(() => loadRemoteSources(config), /must include name and host/);
   });
 });
