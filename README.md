@@ -103,9 +103,11 @@ Five tools available in any MCP-capable session:
 | `urchin_ingest` | **End of every session** — records what was worked on. Params: `content`, `workspace` (required); `source`, `title`, `kind`, `tags` (optional) |
 | `urchin_recent_activity` | Need context on what was done across all tools. Params: `hours` (default 24), `source`, `limit` |
 | `urchin_project_context` | Need context scoped to one repo or project. Params: `project` (required), `hours`, `limit` |
+| `urchin_session_context` | Need the exact thread for a known session across tools. Params: `session` (required), `hours`, `limit` |
 | `urchin_search` | Find when a topic was last touched. Params: `query` (required), `hours`, `limit` |
 
 The read tools (`urchin_recent_activity`, `urchin_project_context`, `urchin_search`) read from a rolling 30-day JSONL event cache written during each sync. The write tool (`urchin_ingest`) writes immediately — no sync required.
+The session read tool (`urchin_session_context`) lets clients continue a known thread when the upstream tool exposes a stable session id and Urchin has captured it.
 
 Add a global instruction to your AI tool's config file to make this automatic:
 

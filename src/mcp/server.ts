@@ -106,6 +106,29 @@ const TOOL_DEFINITIONS = [
     },
   },
   {
+    name: 'urchin_session_context',
+    description:
+      'Returns events for a specific Urchin session id across all captured tools and adapters. Use this when continuing a thread between Claude, Gemini, Copilot, Codex, shell, or other connected workflows.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        session: {
+          type: 'string',
+          description: 'Exact Urchin session id to retrieve',
+        },
+        hours: {
+          type: 'number',
+          description: 'How many hours back to search (default: 168, i.e. 7 days)',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum events to return (default: 50)',
+        },
+      },
+      required: ['session'],
+    },
+  },
+  {
     name: 'urchin_search',
     description:
       'Full-text search over recent Urchin events. Searches summary and content fields. Useful for finding when a topic was discussed or worked on.',
@@ -151,6 +174,7 @@ function formatEvents(events: Awaited<ReturnType<typeof readCachedEvents>>): str
       timestamp: e.timestamp,
       source: e.source,
       kind: e.kind,
+      ...(e.sessionId ? { sessionId: e.sessionId } : {}),
       identity: e.identity,
       summary: e.summary,
       tags: e.tags,
@@ -252,6 +276,25 @@ export async function startMcpServer(config: UrchinConfig): Promise<void> {
         const inContent = e.content.toLowerCase().includes(project);
         return inTags || inSummary || inContent;
       }).slice(0, limit);
+
+      return {
+        content: [{ type: 'text', text: formatEvents(matched) }],
+      };
+    }
+
+    if (name === 'urchin_session_context') {
+      const session = typeof params.session === 'string' ? params.session.trim() : '';
+      if (!session) {
+        return { content: [{ type: 'text', text: 'session parameter is required.' }], isError: true };
+      }
+      const hours = typeof params.hours === 'number' ? params.hours : 168;
+      const limit = typeof params.limit === 'number' ? params.limit : 50;
+
+      const matched = await readCachedEvents(config.eventCachePath, {
+        since: hoursAgo(hours),
+        session,
+        limit,
+      });
 
       return {
         content: [{ type: 'text', text: formatEvents(matched) }],

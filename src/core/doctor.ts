@@ -280,7 +280,7 @@ const SPIKE_REPORTS: DoctorSpikeReport[] = [
   {
     id: 'mcp-server',
     status: 'shipped',
-    note: 'Urchin exposes a stdio MCP server (urchin mcp) with four tools: urchin_recent_activity, urchin_project_context, urchin_search, urchin_ingest. Reads from rolling 30-day event cache written during sync.',
+    note: 'Urchin exposes a stdio MCP server (urchin mcp) with six tools: urchin_recent_activity, urchin_project_context, urchin_session_context, urchin_search, urchin_ingest, and urchin_status. Reads from rolling 30-day event cache written during sync.',
   },
   {
     id: 'intake-http',

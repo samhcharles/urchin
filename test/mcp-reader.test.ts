@@ -59,6 +59,50 @@ test('filters events by source', async () => {
   });
 });
 
+test('filters events by session id from provenance', async () => {
+  await withTempDir(async (dir) => {
+    const cachePath = path.join(dir, 'events.jsonl');
+    const matching = makeEvent({
+      id: 'match',
+      timestamp: '2026-04-22T00:00:00.000Z',
+      provenance: { adapter: 'test', location: '/tmp/test', scope: 'local', sessionId: 'thread-1' },
+    });
+    const other = makeEvent({
+      id: 'other',
+      timestamp: '2026-04-22T01:00:00.000Z',
+      provenance: { adapter: 'test', location: '/tmp/test', scope: 'local', sessionId: 'thread-2' },
+    });
+    await fs.writeFile(cachePath, `${JSON.stringify(matching)}\n${JSON.stringify(other)}\n`, 'utf8');
+
+    const result = await readCachedEvents(cachePath, { session: 'thread-1' });
+    assert.equal(result.length, 1);
+    assert.equal(result[0]?.id, 'match');
+    assert.equal(result[0]?.sessionId, 'thread-1');
+  });
+});
+
+test('filters events by session id from metadata fallback', async () => {
+  await withTempDir(async (dir) => {
+    const cachePath = path.join(dir, 'events.jsonl');
+    const matching = makeEvent({
+      id: 'match',
+      timestamp: '2026-04-22T00:00:00.000Z',
+      metadata: { sessionId: 'thread-3' },
+    });
+    const other = makeEvent({
+      id: 'other',
+      timestamp: '2026-04-22T01:00:00.000Z',
+      metadata: { sessionId: 'thread-4' },
+    });
+    await fs.writeFile(cachePath, `${JSON.stringify(matching)}\n${JSON.stringify(other)}\n`, 'utf8');
+
+    const result = await readCachedEvents(cachePath, { session: 'thread-3' });
+    assert.equal(result.length, 1);
+    assert.equal(result[0]?.id, 'match');
+    assert.equal(result[0]?.sessionId, 'thread-3');
+  });
+});
+
 test('respects limit and returns newest first', async () => {
   await withTempDir(async (dir) => {
     const cachePath = path.join(dir, 'events.jsonl');

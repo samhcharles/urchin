@@ -6,6 +6,7 @@ export interface CachedEvent {
   timestamp: string;
   source: EventSource;
   kind: EventKind;
+  sessionId?: string;
   summary: string;
   content: string;
   identity?: EventIdentity;
@@ -15,6 +16,7 @@ export interface CachedEvent {
 
 export interface ReadOptions {
   since?: Date;
+  session?: string;
   source?: EventSource;
   limit?: number;
 }
@@ -32,11 +34,19 @@ export async function readCachedEvents(cachePath: string, opts: ReadOptions = {}
       if (!e.id || !e.timestamp || !e.source) continue;
       if (opts.since && new Date(e.timestamp) < opts.since) continue;
       if (opts.source && e.source !== opts.source) continue;
+      const sessionId =
+        typeof e.provenance?.sessionId === 'string' && e.provenance.sessionId.trim()
+          ? e.provenance.sessionId
+          : typeof e.metadata?.sessionId === 'string' && e.metadata.sessionId.trim()
+            ? e.metadata.sessionId
+            : undefined;
+      if (opts.session && sessionId !== opts.session) continue;
       events.push({
         id: e.id,
         timestamp: e.timestamp,
         source: e.source,
         kind: e.kind,
+        ...(sessionId ? { sessionId } : {}),
         summary: e.summary,
         content: e.content,
         ...(e.identity ? { identity: e.identity } : {}),

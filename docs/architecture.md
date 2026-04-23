@@ -42,6 +42,13 @@ Urchin now also supports conservative promotion beyond archive:
 - managed sync signal sections inside the Urchin resource note
 - managed decision sections inside `30-resources/decisions.md` when source events are explicitly tagged as decisions
 
+Session continuity is also a first-class retrieval concern:
+
+- collectors preserve source session ids where the upstream tool exposes them
+- the rolling cache preserves those session ids
+- MCP clients can query a specific thread with `urchin_session_context`
+- this makes "continue the same work in another tool" queryable instead of implied
+
 ## Intake contract
 
 External producers should write append-only JSONL under the intake root:
