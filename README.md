@@ -1,10 +1,12 @@
-# Urchin
+# Urchin — Node.js spike
 
-**Context substrate for AI-heavy workflows.**
+> **This is the reference prototype.** The production Rust implementation is at [samhcharles/urchin-rust](https://github.com/samhcharles/urchin-rust).
+
+**Continuity substrate for AI-heavy workflows.**
 
 You use Claude, Copilot, Gemini, Codex, VS Code, the shell. Each one starts fresh. Each one has its own history, its own memory, its own idea of what you worked on. There is no shared substrate — so you repeat yourself, lose context between tools, and nothing ever feels connected.
 
-Urchin fixes that. It collects activity from every tool you use, archives it into an Obsidian vault, and exposes it back as queryable context through an MCP server and an HTTP intake endpoint. One sync cadence. One archive. Every tool connected.
+Urchin fixes that. It gives every tool the same continuity layer by collecting activity, normalizing it into a canonical journal, projecting it into human-readable views, and exposing it back through MCP and HTTP.
 
 Under the hood, Urchin now keeps a canonical append-only machine journal beneath the rolling cache
 and vault projections. Vault notes stay human-readable; the journal stays machine-readable.
@@ -17,10 +19,24 @@ Codex ───┼──► Urchin core ────►├─ Obsidian vault arc
 shell ───┤    (sync, dedupe,   │   └── readable by any agent, any session
 git ─────┤     redact, write)  └─ HTTP /ingest endpoint
 VS Code ─┤                         └── Gemini, aider, scripts, browsers, VPS agents
-OpenClaw-┘
+local agents ┘
 ```
 
-This is not a note-taking app or a memory layer bolted onto one tool. It is infrastructure — like git, but for context.
+This is not a note-taking app or a memory layer bolted onto one tool. It is infrastructure — a local-first memory substrate.
+
+## Founder rule
+
+The personal continuity layer in active use is the reference implementation for Urchin.
+
+- What works across Claude, Copilot, Gemini, Codex, shell, and VS Code locally should match the substrate being built.
+- Do not drift into a separate "product memory" model that the founder does not actually use.
+
+## Core stack
+
+1. **Capture** — collectors, MCP, HTTP intake, and queue contracts
+2. **Core** — canonical append-only journal plus normalized memory objects with provenance
+3. **Sync** — projections into vault notes, caches, archives, and future replicas
+4. **Governance** — privacy tiers, auditability, approvals, rollback, and policy over time
 
 ---
 
@@ -45,7 +61,7 @@ For public-facing positioning and launch copy built on top of Urchin, see:
 | **VS Code** | Bridge queue at `URCHIN_VSCODE_EVENTS_PATH` — populated via MCP or CLI |
 | **Shell** | Reads `~/.bash_history`, filters noise |
 | **Git** | Reads commit history across your repo roots |
-| **OpenClaw** | Reads command log and cron run JSONL from agent orchestration |
+| **Legacy adapters** | Optional collector pattern for retired or external runtimes |
 | **Agent bridge** | Generic JSONL queue for Codex-style or custom runtimes |
 | **HTTP intake** | POST to `/ingest` from any tool, script, browser, or remote agent |
 
@@ -103,11 +119,9 @@ Five tools available in any MCP-capable session:
 | `urchin_ingest` | **End of every session** — records what was worked on. Params: `content`, `workspace` (required); `source`, `title`, `kind`, `tags` (optional) |
 | `urchin_recent_activity` | Need context on what was done across all tools. Params: `hours` (default 24), `source`, `limit` |
 | `urchin_project_context` | Need context scoped to one repo or project. Params: `project` (required), `hours`, `limit` |
-| `urchin_session_context` | Need the exact thread for a known session across tools. Params: `session` (required), `hours`, `limit` |
 | `urchin_search` | Find when a topic was last touched. Params: `query` (required), `hours`, `limit` |
 
 The read tools (`urchin_recent_activity`, `urchin_project_context`, `urchin_search`) read from a rolling 30-day JSONL event cache written during each sync. The write tool (`urchin_ingest`) writes immediately — no sync required.
-The session read tool (`urchin_session_context`) lets clients continue a known thread when the upstream tool exposes a stable session id and Urchin has captured it.
 
 Add a global instruction to your AI tool's config file to make this automatic:
 
@@ -124,7 +138,7 @@ Call urchin_ingest at the end with a summary of what was worked on.
 
 ## HTTP intake server
 
-For tools that cannot use MCP — Gemini CLI, aider, shell scripts, browser extensions, remote VPS agents:
+For tools that cannot use MCP — Gemini CLI, aider, shell scripts, browser extensions, remote agents:
 
 ```bash
 # Start the server (auto-selects a free port)
@@ -198,8 +212,6 @@ urchin init --mode starter --vault ~/brain     # scaffold new vault layout
 urchin setup-personal --enable true            # write systemd timer, env file, personal note
 urchin identity                                # print resolved node identity and its source
 urchin identity --write true --device vps-1    # persist actor/account/device identity for this node
-urchin pull-remote --name vps --host user@host # mirror a remote node journal over SSH into local sync
-urchin pull-remotes                            # mirror every configured remote source
 urchin status                                  # print resolved config and last sync state
 urchin doctor                                  # runtime diagnostics — what works, what is missing
 ```
@@ -226,9 +238,8 @@ All paths are configurable via environment variables. Set them in `~/.config/urc
 | `URCHIN_COPILOT_SESSION_ROOT` | `~/.copilot/session-state` |
 | `URCHIN_GEMINI_TMP_ROOT` | `~/.gemini/tmp` |
 | `URCHIN_VSCODE_EVENTS_PATH` | `~/.local/share/urchin/editors/vscode/events.jsonl` |
-| `URCHIN_OPENCLAW_COMMANDS_LOG` | `~/.openclaw/logs/commands.log` |
-| `URCHIN_OPENCLAW_CRON_RUNS_DIR` | `~/.openclaw/cron/runs` |
-| `URCHIN_REMOTE_MIRROR_ROOT` | `~/.local/share/urchin/remotes` |
+| `URCHIN_OPENCLAW_COMMANDS_LOG` | optional legacy adapter path |
+| `URCHIN_OPENCLAW_CRON_RUNS_DIR` | optional legacy adapter path |
 | `URCHIN_SHELL_HISTORY_FILE` | `~/.bash_history` |
 | `URCHIN_SHELL_IGNORE_PREFIXES` | `cd,ls,pwd,clear,history,exit` |
 | `URCHIN_SHELL_MIN_COMMAND_LENGTH` | `8` |
@@ -238,7 +249,6 @@ All paths are configurable via environment variables. Set them in `~/.config/urc
 | `URCHIN_PROJECT_ALIAS_PATH` | `~/.config/urchin/project-aliases.json` |
 | `URCHIN_VSCODE_WORKSPACE_ALIASES_PATH` | `~/.config/urchin/vscode-workspaces.json` |
 | `URCHIN_INBOX_CAPTURE_PATH` | `~/brain/00-inbox/urchin-capture.md` |
-| `URCHIN_REMOTE_SOURCES_PATH` | `~/.config/urchin/remotes.json` |
 
 Urchin now persists node identity at `~/.config/urchin/identity.json` so WSL, VPS, and other nodes
 can carry durable actor/account/device identity instead of depending only on transient env vars.
@@ -247,37 +257,6 @@ Identity fields in the canonical journal can still be overridden with `URCHIN_AC
 `URCHIN_ACCOUNT_ID`, `URCHIN_DEVICE_ID`, and `URCHIN_DEFAULT_VISIBILITY`. Env overrides win over
 the identity file. If neither exists, Urchin falls back to the local username, hostname, and
 `private` visibility.
-
-### Remote node mirror
-
-Use this when a VPS or second machine has its own Urchin journal and you want those events pulled
-into the same local sync pipeline.
-
-```bash
-urchin pull-remote --name vps --host user@2.24.29.238
-urchin sync
-```
-
-`pull-remote` mirrors the remote journal into `~/.local/share/urchin/remotes/<name>/events.jsonl`.
-The next `urchin sync` reads that mirror through the remote collector and lands those events in the
-same archive, project notes, cache, and MCP surfaces. This is a truthful bridge, not full automatic
-replication yet.
-
-For repeatable pulls, define remote sources in `~/.config/urchin/remotes.json`:
-
-```json
-{
-  "remotes": [
-    {
-      "name": "vps",
-      "host": "user@2.24.29.238"
-    }
-  ]
-}
-```
-
-Then either run `urchin pull-remotes` directly or let normal `urchin sync` pull configured remotes
-before collecting local and mirrored events.
 
 ---
 
@@ -330,10 +309,8 @@ Tests live in `test/`. Every collector has a test fixture. Keep them passing —
 | Agent bridge | ✅ shipped | Generic JSONL queue + `urchin ingest-agent` |
 | Universal awareness docs | ✅ shipped | Wiring guide for every major tool type |
 | Durable node identity | ✅ shipped | Persist actor/account/device identity in `~/.config/urchin/identity.json` and surface it in status/doctor |
-| Remote journal pull bridge | ✅ shipped | Mirror a remote node journal over SSH into the local sync pipeline |
 | Replication foundation | 🔲 planned | Move journal continuity cleanly across WSL / Windows / VPS |
-| Configured remote sync | ✅ shipped | `urchin sync` can auto-pull configured remotes from `~/.config/urchin/remotes.json` |
-| VPS / remote automation | 🔲 planned | stronger service-backed or bidirectional flows beyond configured SSH pulls |
+| VPS / remote bridge | 🔲 planned | SSH-pull remote cron run JSONL on sync |
 | Browser intake | 🔲 planned | Extension or bookmarklet POSTing to intake |
 | Neovim plugin | 🔲 planned | Editor bridge for terminal-first workflows |
 | JetBrains plugin | 🔲 planned | Native editor bridge for JetBrains IDEs |

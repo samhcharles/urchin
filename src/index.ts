@@ -5,7 +5,6 @@ import * as fs from 'fs-extra';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { setupIntakeService } from './bootstrap/intake';
 import { initializeVault, InitMode } from './bootstrap/init';
 import { setupPersonalWorkflow } from './bootstrap/personal';
 import { AgentCollector } from './collectors/agent';
@@ -14,18 +13,13 @@ import { CopilotCollector } from './collectors/copilot';
 import { GeminiCollector } from './collectors/gemini';
 import { IntakeCollector } from './collectors/intake';
 import { OpenClawCollector } from './collectors/openclaw';
-import { RemoteCollector } from './collectors/remote';
 import { GitCollector, ShellCollector } from './collectors/shell';
 import { VSCodeCollector } from './collectors/vscode';
 import { loadConfig } from './core/config';
 import { buildDoctorReport } from './core/doctor';
-import { ensureNodeIdentity, NodeIdentityProfile, resolveNodeIdentity } from './core/identity';
-import { startIntakeServer } from './intake/server';
-import { startMcpServer } from './mcp/server';
 import { runSync } from './core/sync';
 import { loadState } from './core/state';
 import { appendManualCapture } from './obsidian/writer';
-import { loadRemoteSources, pullConfiguredRemoteJournals, pullRemoteJournal } from './replication/remote';
 import { Linker } from './synthesis/linker';
 import { Collector, EventKind, EventSource } from './types';
 
@@ -58,16 +52,6 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
-  if (command === 'mcp') {
-    await startMcpServer(config);
-    return;
-  }
-
-  if (command === 'serve') {
-    await serve(config);
-    return;
-  }
-
   if (command === 'dump') {
     const text = args.slice(1).join(' ');
     if (!text) {
@@ -99,11 +83,6 @@ async function main() {
     return;
   }
 
-  if (command === 'setup-intake') {
-    await setupIntake(config, args.slice(1));
-    return;
-  }
-
   if (command === 'setup-personal') {
     await setupPersonal(config, args.slice(1));
     return;
@@ -116,21 +95,6 @@ async function main() {
 
   if (command === 'doctor') {
     await doctor(config);
-    return;
-  }
-
-  if (command === 'identity') {
-    await identity(config, args.slice(1));
-    return;
-  }
-
-  if (command === 'pull-remote') {
-    await pullRemote(config, args.slice(1));
-    return;
-  }
-
-  if (command === 'pull-remotes') {
-    await pullRemotes(config);
     return;
   }
 
@@ -208,25 +172,6 @@ async function setupPersonal(config: ReturnType<typeof loadConfig>, args: string
   console.log(`Urchin: timer active: ${result.state.timerActive === null ? 'unknown' : result.state.timerActive}`);
 }
 
-async function setupIntake(config: ReturnType<typeof loadConfig>, args: string[]) {
-  const { flags } = parseFlags(args);
-  const result = await setupIntakeService({
-    config,
-    enableSystemd: flags.enable === 'true',
-  });
-
-  console.log(`Urchin: intake service setup written to ${result.written.length} path(s).`);
-  if (result.created.length > 0) {
-    console.log(`Urchin: created ${result.created.length} new intake service path(s).`);
-  }
-  if (result.updated.length > 0) {
-    console.log(`Urchin: updated ${result.updated.length} existing intake service path(s).`);
-  }
-  console.log(`Urchin: systemd available: ${result.state.systemdAvailable}`);
-  console.log(`Urchin: intake service enabled: ${result.state.serviceEnabled === null ? 'unknown' : result.state.serviceEnabled}`);
-  console.log(`Urchin: intake service active: ${result.state.serviceActive === null ? 'unknown' : result.state.serviceActive}`);
-}
-
 function formatSyncSummary(result: Awaited<ReturnType<typeof runSync>>): string[] {
   const lines = [
     `Urchin: collected ${result.collectedCount} event(s), deduped to ${result.dedupedCount}, wrote ${result.writtenCount}.`,
@@ -249,17 +194,6 @@ function formatSyncSummary(result: Awaited<ReturnType<typeof runSync>>): string[
 }
 
 async function sync(config: ReturnType<typeof loadConfig>) {
-  const remotePulls = await pullConfiguredRemoteJournals({ config });
-  if (remotePulls.configuredCount > 0) {
-    console.log(`Urchin: configured remote sources ${remotePulls.configuredCount} from ${remotePulls.configPath}`);
-  }
-  for (const remote of remotePulls.pulled) {
-    console.log(`Urchin: mirrored ${remote.eventCount} remote event(s) from ${remote.host} into ${remote.journalMirrorPath}`);
-  }
-  for (const failure of remotePulls.failures) {
-    console.error(`Urchin: remote pull ${failure.name} (${failure.host}) failed (${failure.error}).`);
-  }
-
   const collectors: Collector[] = [
     new AgentCollector(config),
     new IntakeCollector(config),
@@ -267,7 +201,6 @@ async function sync(config: ReturnType<typeof loadConfig>) {
     new GeminiCollector(config),
     new ClaudeCollector(config),
     new OpenClawCollector(config),
-    new RemoteCollector(config),
     new ShellCollector(config),
     new GitCollector(config),
     new VSCodeCollector(config),
@@ -306,23 +239,10 @@ async function sync(config: ReturnType<typeof loadConfig>) {
   for (const line of formatSyncSummary(result)) {
     console.log(line);
   }
-
-  if (remotePulls.failures.length > 0) {
-    process.exitCode = 1;
-  }
 }
 
 async function status(config: ReturnType<typeof loadConfig>) {
   const state = await loadState(config.statePath);
-  const identity = await resolveNodeIdentity(config);
-  let remoteConfiguredCount = 0;
-  let remoteConfigError: string | undefined;
-  try {
-    const remoteSources = await loadRemoteSources(config);
-    remoteConfiguredCount = remoteSources.remotes.length;
-  } catch (error) {
-    remoteConfigError = error instanceof Error ? error.message : String(error);
-  }
   console.log(
     JSON.stringify(
       {
@@ -330,11 +250,6 @@ async function status(config: ReturnType<typeof loadConfig>) {
         archiveRoot: config.archiveRoot,
         claudeHistoryFile: config.claudeHistoryFile,
         copilotSessionRoot: config.copilotSessionRoot,
-        eventJournalPath: config.eventJournalPath,
-        identity: identity.identity,
-        identityFileExists: identity.exists,
-        identityPath: identity.path,
-        identitySources: identity.sources,
         geminiTmpRoot: config.geminiTmpRoot,
         inboxCapturePath: config.inboxCapturePath,
         intakeRoot: config.intakeRoot,
@@ -342,10 +257,6 @@ async function status(config: ReturnType<typeof loadConfig>) {
         openclawCommandsLog: config.openclawCommandsLog,
         openclawCronRunsDir: config.openclawCronRunsDir,
         projectAliasPath: config.projectAliasPath,
-        remoteMirrorRoot: config.remoteMirrorRoot,
-        remoteConfiguredCount,
-        remoteSourcesPath: config.remoteSourcesPath,
-        ...(remoteConfigError ? { remoteConfigError } : {}),
         reposRoots: config.reposRoots,
         shellHistoryFile: config.shellHistoryFile,
         statePath: config.statePath,
@@ -361,77 +272,6 @@ async function status(config: ReturnType<typeof loadConfig>) {
 async function doctor(config: ReturnType<typeof loadConfig>) {
   const report = await buildDoctorReport(config);
   console.log(JSON.stringify(report, null, 2));
-}
-
-function parseVisibilityFlag(value: string | undefined) {
-  if (!value) {
-    return undefined;
-  }
-
-  if (value === 'private' || value === 'team' || value === 'public') {
-    return value;
-  }
-
-  console.error('Usage: urchin identity [--write true] [--actor id] [--account id] [--device id] [--visibility private|team|public]');
-  process.exit(1);
-}
-
-async function identity(config: ReturnType<typeof loadConfig>, args: string[]) {
-  const { flags } = parseFlags(args);
-  const shouldWrite = flags.write === 'true'
-    || Boolean(flags.actor || flags.account || flags.device || flags.visibility);
-  const visibility = parseVisibilityFlag(flags.visibility);
-  const overrides: Partial<NodeIdentityProfile> = {
-    ...(flags.account ? { accountId: flags.account } : {}),
-    ...(flags.actor ? { actorId: flags.actor } : {}),
-    ...(flags.device ? { deviceId: flags.device } : {}),
-    ...(visibility ? { visibility } : {}),
-  };
-  const report = shouldWrite
-    ? await ensureNodeIdentity(config, overrides)
-    : await resolveNodeIdentity(config);
-
-  console.log(JSON.stringify(report, null, 2));
-}
-
-async function pullRemote(config: ReturnType<typeof loadConfig>, args: string[]) {
-  const { flags } = parseFlags(args);
-  const name = flags.name?.trim();
-  const host = flags.host?.trim();
-
-  if (!name || !host) {
-    console.error(
-      'Usage: urchin pull-remote --name vps --host user@host [--journal ~/.local/share/urchin/journal/events.jsonl] [--identity ~/.config/urchin/identity.json]',
-    );
-    process.exit(1);
-  }
-
-  const result = await pullRemoteJournal({
-    config,
-    host,
-    identityPath: flags.identity,
-    journalPath: flags.journal,
-    name,
-  });
-
-  console.log(`Urchin: mirrored ${result.eventCount} remote event(s) from ${result.host} into ${result.journalMirrorPath}`);
-  console.log(`Urchin: identity fetched: ${result.identityFetched}`);
-  console.log(`Urchin: manifest written to ${result.manifestPath}`);
-}
-
-async function pullRemotes(config: ReturnType<typeof loadConfig>) {
-  const result = await pullConfiguredRemoteJournals({ config });
-  console.log(`Urchin: configured remote sources ${result.configuredCount} from ${result.configPath}`);
-  for (const remote of result.pulled) {
-    console.log(`Urchin: mirrored ${remote.eventCount} remote event(s) from ${remote.host} into ${remote.journalMirrorPath}`);
-  }
-  for (const failure of result.failures) {
-    console.error(`Urchin: remote pull ${failure.name} (${failure.host}) failed (${failure.error}).`);
-  }
-
-  if (result.failures.length > 0) {
-    process.exitCode = 1;
-  }
 }
 
 async function ingest(config: ReturnType<typeof loadConfig>, args: string[]) {
@@ -573,24 +413,6 @@ async function resolveWorkspacePath(config: ReturnType<typeof loadConfig>, works
   }
 
   return workspaceArg;
-}
-
-async function serve(config: ReturnType<typeof loadConfig>) {
-  const { server, port } = await startIntakeServer(config);
-  console.log(`Urchin: intake server listening on http://127.0.0.1:${port}`);
-  console.log(`Urchin: port recorded at ${config.intakePortFile}`);
-  console.log('Urchin: POST /ingest  { content, source?, kind?, summary?, tags?, metadata? }');
-  console.log('Urchin: GET  /health  → { status: "ok", service: "urchin-intake", port }');
-
-  const shutdown = async () => {
-    await fs.remove(config.intakePortFile).catch(() => undefined);
-    server.close();
-    process.exit(0);
-  };
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
-
-  await new Promise(() => { /* keep alive */ });
 }
 
 main().catch((error) => {

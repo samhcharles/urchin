@@ -10,7 +10,7 @@ It is the destination and overarching platform for AI workflow evaluation and in
 It observes, evaluates, and manages.
 
 ### Urchin by Orinadus
-The universal substrate.
+our memory syncing substrate.
 The memory bus that bridges local, cloud, web, CLI, and diverse AI model workflows into one unified context core.
 It fixes memory fragmentation.
 

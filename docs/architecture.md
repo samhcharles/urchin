@@ -1,24 +1,37 @@
 # Urchin Architecture
 
-Urchin is a **local-first context bridge**. It is meant to pull scattered AI, shell, and code activity into an Obsidian vault without pretending the bridge itself is the brain.
+Urchin is a **local-first continuity substrate**. It is meant to pull scattered AI, shell, and code activity into a canonical memory core and project it into human-readable and machine-readable surfaces without pretending one adapter is the whole system.
+
+## Founder rule
+
+The continuity layer used personally is the reference implementation for Urchin. The local founder stack and the product substrate should not diverge into separate architectures.
+
+## Memory stack
+
+1. **Capture**
+2. **Core**
+3. **Sync**
+4. **Governance**
 
 ## Core
 
 The core owns the rules that should stay stable as adapters grow:
 
 - canonical `UrchinEvent` envelopes
+- canonical facts, preferences, decisions, entities, and project memory shapes over time
 - async agent lifecycle envelopes for launched/completed/failed work
 - explicit provenance
 - redaction before persistence
 - deterministic note writing
 - incremental sync state
 - dedupe
+- conflict resolution policy hooks
 
 ## Spikes
 
 Spikes are adapters and outputs that plug into the core:
 
-- source collectors: Copilot, Claude, Gemini, Git, shell, OpenClaw, VS Code bridge
+- source collectors: Copilot, Claude, Gemini, Git, shell, legacy adapters, VS Code bridge
 - generic agent bridge collectors for Codex-style or custom runtimes that can emit append-only local events
 - editor adapters and extension bridges, starting with a shipped VS Code queue contract
 - bounded append-only intake for browser or network-fed events
@@ -41,6 +54,14 @@ Urchin now also supports conservative promotion beyond archive:
 - managed `## Urchin Context` sections inside project notes
 - managed sync signal sections inside the Urchin resource note
 - managed decision sections inside `30-resources/decisions.md` when source events are explicitly tagged as decisions
+
+Governance sits above those surfaces:
+
+- privacy tiers
+- approvals
+- auditability
+- rollback
+- policy-driven recall and sharing
 
 Session continuity is also a first-class retrieval concern:
 

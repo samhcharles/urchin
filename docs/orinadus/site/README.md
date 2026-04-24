@@ -1,6 +1,14 @@
-# Orinadus Site (Starter)
+# Orinadus Site (Legacy Starter)
 
-Simple static starter for Orinadus messaging.
+Legacy static starter for early messaging exploration.
+
+It is **not** the target Orinadus product architecture. The real direction is:
+
+- Cloudflare at the edge
+- Coolify on the VPS
+- Next.js full-stack control plane
+- Urchin as the sync substrate
+- governance and dashboard layers above the substrate
 
 ## Run locally
 

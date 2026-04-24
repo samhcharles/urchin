@@ -19,16 +19,9 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
     geminiTmpRoot: path.join(root, '.gemini', 'tmp'),
     inboxCapturePath: path.join(vaultRoot, '00-inbox', 'urchin-capture.md'),
     intakeRoot: path.join(root, 'intake'),
-    intakePort: 18799,
-    intakePortFile: path.join(root, 'intake.port'),
-     openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
-     openclawCronRunsDir: path.join(root, '.openclaw', 'cron', 'runs'),
-     eventCachePath: path.join(root, '.local', 'share', 'urchin', 'event-cache.jsonl'),
-     eventJournalPath: path.join(root, '.local', 'share', 'urchin', 'journal', 'events.jsonl'),
-     identityPath: path.join(root, '.config', 'urchin', 'identity.json'),
-     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
-    remoteMirrorRoot: path.join(root, '.local', 'share', 'urchin', 'remotes'),
-    remoteSourcesPath: path.join(root, '.config', 'urchin', 'remotes.json'),
+    openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
+    openclawCronRunsDir: path.join(root, '.openclaw', 'cron', 'runs'),
+    projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     reposRoots: [path.join(root, 'dev')],
     shellIgnorePrefixes: ['cd', 'ls'],
     shellMinCommandLength: 8,
@@ -69,18 +62,14 @@ test('setupPersonalWorkflow writes the personal env, systemd units, and workflow
       fs.readFile(notePath, 'utf8'),
     ]);
 
-    assert.equal(result.written.length, 5);
+    assert.equal(result.written.length, 4);
     assert.match(env, /URCHIN_VAULT_ROOT/);
     assert.match(env, /URCHIN_AGENT_EVENTS_PATH/);
-    assert.match(env, /URCHIN_IDENTITY_PATH/);
-    assert.match(env, /URCHIN_REMOTE_MIRROR_ROOT/);
     assert.match(env, /URCHIN_OPENCLAW_CRON_RUNS_DIR/);
     assert.match(service, /ExecStart="\/usr\/bin\/node" "\/tmp\/urchin\/dist\/src\/index\.js" sync/);
     assert.match(timer, /OnUnitActiveSec=5m/);
     assert.match(note, /Urchin Personal Workflow/);
     assert.match(note, /Agent bridge queue/);
-    assert.match(note, /Node identity file/);
-    assert.match(note, /Remote mirror root/);
     assert.match(note, /OpenClaw cron runs/);
   });
 });

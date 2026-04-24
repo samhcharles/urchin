@@ -20,16 +20,9 @@ async function withTempConfig(run: (config: UrchinConfig, root: string) => Promi
     geminiTmpRoot: path.join(root, '.gemini', 'tmp'),
     inboxCapturePath: path.join(vaultRoot, '00-inbox', 'urchin-capture.md'),
     intakeRoot: path.join(root, 'intake'),
-    intakePort: 18799,
-    intakePortFile: path.join(root, 'intake.port'),
-     openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
-     openclawCronRunsDir: path.join(root, '.openclaw', 'cron', 'runs'),
-     eventCachePath: path.join(root, '.local', 'share', 'urchin', 'event-cache.jsonl'),
-     eventJournalPath: path.join(root, '.local', 'share', 'urchin', 'journal', 'events.jsonl'),
-     identityPath: path.join(root, '.config', 'urchin', 'identity.json'),
-     projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
-    remoteMirrorRoot: path.join(root, '.local', 'share', 'urchin', 'remotes'),
-    remoteSourcesPath: path.join(root, '.config', 'urchin', 'remotes.json'),
+    openclawCommandsLog: path.join(root, '.openclaw', 'logs', 'commands.log'),
+    openclawCronRunsDir: path.join(root, '.openclaw', 'cron', 'runs'),
+    projectAliasPath: path.join(root, '.config', 'urchin', 'project-aliases.json'),
     reposRoots: [path.join(root, 'dev'), path.join(root, 'repos')],
     shellIgnorePrefixes: ['cd', 'ls'],
     shellMinCommandLength: 8,
@@ -83,28 +76,8 @@ test('buildDoctorReport distinguishes reachable shipped collectors from planned 
   await withTempConfig(async (config, root) => {
     await fs.ensureDir(path.join(root, '.config', 'urchin'));
     await fs.ensureDir(path.join(root, '.config', 'systemd', 'user'));
-      await fs.writeFile(path.join(root, '.config', 'urchin', 'personal.env'), 'URCHIN_VAULT_ROOT="/tmp/vault"\n', 'utf8');
-      await fs.writeJson(config.remoteSourcesPath, {
-        remotes: [{ name: 'vps', host: 'user@2.24.29.238' }],
-      });
-      await fs.writeJson(path.join(root, '.config', 'urchin', 'identity.json'), {
-        accountId: 'samhc',
-        actorId: 'sam-founder',
-        deviceId: 'wsl-dev',
-        visibility: 'private',
-      });
-      await fs.ensureDir(path.join(config.remoteMirrorRoot, 'vps'));
-      await fs.writeJson(path.join(config.remoteMirrorRoot, 'vps', 'manifest.json'), {
-        eventCount: 12,
-        host: 'user@2.24.29.238',
-        identityFetched: true,
-        identityMirrorPath: path.join(config.remoteMirrorRoot, 'vps', 'identity.json'),
-        journalMirrorPath: path.join(config.remoteMirrorRoot, 'vps', 'events.jsonl'),
-        journalRemotePath: '~/.local/share/urchin/journal/events.jsonl',
-        mirrorName: 'vps',
-        pulledAt: '2026-04-21T09:30:00.000Z',
-      });
-      await fs.writeFile(path.join(root, '.config', 'systemd', 'user', 'urchin.service'), '[Service]\n', 'utf8');
+    await fs.writeFile(path.join(root, '.config', 'urchin', 'personal.env'), 'URCHIN_VAULT_ROOT="/tmp/vault"\n', 'utf8');
+    await fs.writeFile(path.join(root, '.config', 'systemd', 'user', 'urchin.service'), '[Service]\n', 'utf8');
     await fs.writeFile(path.join(root, '.config', 'systemd', 'user', 'urchin.timer'), '[Timer]\n', 'utf8');
     await fs.ensureDir(path.join(config.vaultRoot, '30-resources', 'ai'));
     await fs.writeFile(path.join(config.vaultRoot, '30-resources', 'ai', 'urchin-personal.md'), '# Personal\n', 'utf8');
@@ -129,12 +102,9 @@ test('buildDoctorReport distinguishes reachable shipped collectors from planned 
     assert.equal(report.sync.connectedSourceCount >= 1, true);
     assert.equal(report.sync.lastSyncWrittenCount, 6);
     assert.equal(report.automation.envExists, true);
-     assert.equal(report.automation.serviceInstalled, true);
-     assert.equal(report.automation.timerInstalled, true);
-     assert.equal(report.automation.personalNoteExists, true);
-      assert.equal(report.identity.exists, true);
-      assert.equal(report.identity.actorId, 'sam-founder');
-      assert.equal(report.identity.deviceId, 'wsl-dev');
+    assert.equal(report.automation.serviceInstalled, true);
+    assert.equal(report.automation.timerInstalled, true);
+    assert.equal(report.automation.personalNoteExists, true);
 
     const copilot = report.sources.find((source) => source.source === 'copilot');
     assert.ok(copilot);
@@ -151,28 +121,18 @@ test('buildDoctorReport distinguishes reachable shipped collectors from planned 
     assert.equal(openclaw.status, 'ready');
     assert.equal(openclaw.details?.cronRunFiles, 1);
 
-      const git = report.sources.find((source) => source.source === 'git');
-      assert.ok(git);
-      assert.equal(git.details?.discoveredRepos, 1);
+    const git = report.sources.find((source) => source.source === 'git');
+    assert.ok(git);
+    assert.equal(git.details?.discoveredRepos, 1);
 
-      const remote = report.sources.find((source) => source.source === 'remote');
-      assert.ok(remote);
-      assert.equal(remote.status, 'ready');
-      assert.equal(remote.details?.configuredRemotes, 1);
-      assert.equal(remote.details?.mirroredNodes, 1);
-
-      assert.equal(report.sync.shippedSourceCount, 10);
+    assert.equal(report.sync.shippedSourceCount, 9);
 
     const vscodeSpike = report.spikes.find((spike) => spike.id === 'editor-vscode');
     assert.ok(vscodeSpike);
     assert.equal(vscodeSpike.status, 'shipped');
 
-      const agentSpike = report.spikes.find((spike) => spike.id === 'agent-bridge');
-      assert.ok(agentSpike);
-      assert.equal(agentSpike.status, 'shipped');
-
-      const remoteSpike = report.spikes.find((spike) => spike.id === 'remote-journal-bridge');
-      assert.ok(remoteSpike);
-      assert.equal(remoteSpike.status, 'shipped');
-    });
+    const agentSpike = report.spikes.find((spike) => spike.id === 'agent-bridge');
+    assert.ok(agentSpike);
+    assert.equal(agentSpike.status, 'shipped');
+  });
 });
