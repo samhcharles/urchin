@@ -5,3 +5,6 @@ dist/
 
 # Local agent context — keep out of public repo
 AGENTS.md
+.github/agents/
+.github/copilot-instructions.md
+docs/agent-start-here.md
