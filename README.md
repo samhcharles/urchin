@@ -1,4 +1,4 @@
-# Urchin — Node.js spike
+# Urchin spike prototype
 
 > **This is the reference prototype.** The production Rust implementation is at [samhcharles/urchin-rust](https://github.com/samhcharles/urchin-rust).
 
